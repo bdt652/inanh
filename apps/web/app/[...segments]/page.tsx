@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import AmbientGlow from "../components/AmbientGlow";
 import FooterSection from "../components/FooterSection";
 import HeaderBar from "../components/HeaderBar";
+import ProductGrid from "../components/ProductGrid";
 import ScrollProgress from "../components/ScrollProgress";
 import { getAllProducts, getBestSellers, getCategories, getMenuItems, getPageByPath, getSiteSettings } from "../lib/api";
 import type { ProductCard } from "../lib/content";
@@ -281,32 +282,16 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
           )}
 
           {categoryMatch && displayProducts.length > 0 && (
-            <div className="mt-8">
-              <h2 className="font-display text-2xl font-semibold md:text-3xl">
-                Bài viết/Sản phẩm trong danh mục {categoryMatch.label}
-              </h2>
-              <p className="mt-2 text-sm text-[var(--text-soft)]">
-                {categoryProducts.length > 0
-                  ? `Tổng số: ${categoryProducts.length}`
-                  : "Chưa có mục nào gắn danh mục này, hiển thị gợi ý nổi bật."}
-              </p>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {displayProducts.map((item) => (
-                  <article key={item.slug ?? item.id ?? item.title} className="panel rounded-none p-4">
-                    <h3 className="text-lg font-semibold">{item.title}</h3>
-                    <p className="mt-1 text-sm text-[var(--text-soft)] line-clamp-3">{item.short || item.description}</p>
-                    {item.slug || item.id ? (
-                      <a
-                        href={toHtmlPath(`/san-pham/${encodeURIComponent(item.slug ?? item.id ?? "")}`)}
-                        className="mt-3 inline-block text-sm font-semibold text-[var(--accent-strong)] underline"
-                      >
-                        Xem chi tiết
-                      </a>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            </div>
+            <section className="mt-10 border-t border-[var(--line)] pt-8">
+              <ProductGrid
+                header={categoryProducts.length > 0 ? `Sản phẩm ${categoryMatch.label}` : "Gợi ý nổi bật"}
+                subtitle={categoryProducts.length > 0 ? "Theo danh mục" : "Hiển thị sản phẩm nổi bật"}
+                highlight={`Tổng: ${displayProducts.length}`}
+                products={displayProducts}
+                viewMoreHref="/san-pham"
+                viewMoreLabel="Xem thêm sản phẩm"
+              />
+            </section>
           )}
         </article>
       </main>
