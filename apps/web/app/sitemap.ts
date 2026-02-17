@@ -28,6 +28,7 @@ async function safeFetchList<T>(path: string): Promise<T[]> {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
+  const staticPaths = ["/in-anh"];
   const [menuItems, categories, products] = await Promise.all([
     safeFetchList<MenuItem>("/menu"),
     safeFetchList<Category>("/categories"),
@@ -44,6 +45,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (normalized !== "/admin") dynamicPaths.add(toHtmlPath(normalized));
   });
   dynamicPaths.add(toHtmlPath("/san-pham"));
+  staticPaths.forEach((p) => dynamicPaths.add(toHtmlPath(p)));
   products.forEach((item) => {
     const normalizedSlug = item.slug?.trim();
     if (!normalizedSlug) return;
