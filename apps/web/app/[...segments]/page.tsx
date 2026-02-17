@@ -5,7 +5,8 @@ import AmbientGlow from "../components/AmbientGlow";
 import FooterSection from "../components/FooterSection";
 import HeaderBar from "../components/HeaderBar";
 import ScrollProgress from "../components/ScrollProgress";
-import { getCategories, getMenuItems, getPageByPath, getSiteSettings } from "../lib/api";
+import { getAllProducts, getCategories, getMenuItems, getPageByPath, getSiteSettings } from "../lib/api";
+import type { ProductCard } from "../lib/content";
 import { normalizePath, stripHtmlSuffix, toHtmlPath } from "../lib/paths";
 
 const SITE_NAME = "In ảnh 24h";
@@ -188,7 +189,11 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   }
   const path = toPath(segments);
 
-  const [settings, context] = await Promise.all([getSiteSettings(), resolveDynamicContext(path)]);
+  const [settings, context, products] = await Promise.all([
+    getSiteSettings(),
+    resolveDynamicContext(path),
+    getAllProducts(),
+  ]);
   const { page, categories, menuItems, categoryMatch, menuMatch } = context;
 
   if (!page && !categoryMatch && !menuMatch) {
@@ -201,6 +206,12 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   const renderedContent = resolveRenderableContent(content);
   const description = toMetaDescription(summary || content);
   const breadcrumb = buildBreadcrumb(path, title);
+
+  const normalizedCategoryPath = categoryMatch ? normalizePath(categoryMatch.slug) : null;
+  const categoryProducts: ProductCard[] =
+    normalizedCategoryPath && products.length
+      ? products.filter((p) => normalizePath(p.category_slug ?? "") === normalizedCategoryPath)
+      : [];
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -236,6 +247,31 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
               className="rich-content mt-6 text-sm leading-7 text-[var(--text-soft)] md:text-base"
               dangerouslySetInnerHTML={{ __html: renderedContent }}
             />
+          )}
+
+          {categoryMatch && categoryProducts.length > 0 && (
+            <div className="mt-8">
+              <h2 className="font-display text-2xl font-semibold md:text-3xl">
+                Bài viết/Sản phẩm trong danh mục {categoryMatch.label}
+              </h2>
+              <p className="mt-2 text-sm text-[var(--text-soft)]">Tổng số: {categoryProducts.length}</p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {categoryProducts.map((item) => (
+                  <article key={item.slug ?? item.id ?? item.title} className="panel rounded-none p-4">
+                    <h3 className="text-lg font-semibold">{item.title}</h3>
+                    <p className="mt-1 text-sm text-[var(--text-soft)] line-clamp-3">{item.short || item.description}</p>
+                    {item.slug || item.id ? (
+                      <a
+                        href={toHtmlPath(`/san-pham/${encodeURIComponent(item.slug ?? item.id ?? "")}`)}
+                        className="mt-3 inline-block text-sm font-semibold text-[var(--accent-strong)] underline"
+                      >
+                        Xem chi tiết
+                      </a>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            </div>
           )}
         </article>
       </main>

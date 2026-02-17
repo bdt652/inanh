@@ -4,6 +4,8 @@ import { toHtmlPath } from "../lib/paths";
 
 type Product = {
   id?: string;
+  slug?: string;
+  category_slug?: string;
   title: string;
   short: string;
   old_price: string;
@@ -37,7 +39,7 @@ function sanitizeDescription(value: string): string {
 }
 
 function resolveProductDetailHref(product: Product): string | null {
-  const rawSlug = (product.id ?? "").trim();
+  const rawSlug = (product.slug ?? product.id ?? "").trim();
   if (!rawSlug) {
     return null;
   }

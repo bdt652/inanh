@@ -16,6 +16,8 @@ export type HeroStatement = {
 
 export type ProductCard = {
   id?: string;
+  slug?: string;
+  category_slug?: string;
   title: string;
   short: string;
   old_price: string;
