@@ -231,12 +231,13 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
           });
           const textMatch = (() => {
             const labelNorm = normalizeToken(categoryMatch?.label ?? "");
-            if (!labelNorm) return false;
+            const tokens = labelNorm ? labelNorm.split(/\s+/).filter(Boolean) : [];
+            if (!tokens.length) return false;
             const hay = `${p.title ?? ""} ${p.short ?? ""} ${p.description ?? ""}`
               .split(/\s+/)
               .map(normalizeToken)
               .join(" ");
-            return hay.includes(labelNorm);
+            return tokens.every((t) => hay.includes(t));
           })();
           return cat === normalizedCategoryPath || tagMatch || textMatch;
         })
