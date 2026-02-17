@@ -51,6 +51,33 @@ function absoluteUrl(path: string): string {
   return htmlPath === "/" ? SITE_URL : `${SITE_URL}${htmlPath}`;
 }
 
+function buildBreadcrumb(path: string, title: string) {
+  const parts = path.split("/").filter(Boolean);
+  const items = [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: "Trang chủ",
+      item: SITE_URL,
+    },
+  ];
+  let current = "";
+  parts.forEach((part, idx) => {
+    current += `/${part}`;
+    items.push({
+      "@type": "ListItem",
+      position: idx + 2,
+      name: idx === parts.length - 1 ? title : part.replace(/-/g, " "),
+      item: absoluteUrl(current),
+    });
+  });
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items,
+  };
+}
+
 async function resolveDynamicContext(path: string) {
   const [page, categories, menuItems] = await Promise.all([getPageByPath(path), getCategories(), getMenuItems()]);
   const categoryMatch = categories.find((item) => normalizePath(item.slug) === path);
@@ -173,6 +200,7 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   const content = page?.content ?? resolveFallbackContent(categoryMatch?.label);
   const renderedContent = resolveRenderableContent(content);
   const description = toMetaDescription(summary || content);
+  const breadcrumb = buildBreadcrumb(path, title);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -213,6 +241,7 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
 
       <FooterSection categories={categories} settings={settings} />
     </div>
