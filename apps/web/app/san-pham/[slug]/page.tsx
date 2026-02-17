@@ -105,6 +105,10 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     description,
     sku: product.slug,
     category: categoryLabel(product.category_slug),
+    brand: {
+      "@type": "Brand",
+      name: "In ảnh 24h",
+    },
     offers: {
       "@type": "Offer",
       url: productUrl(product.slug),
@@ -149,6 +153,24 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               </div>
 
               <p className="text-sm leading-7 text-[var(--text-soft)]">{description}</p>
+
+              <div className="flex flex-wrap gap-2 pt-3 text-xs uppercase tracking-[0.18em] text-[var(--text-soft)]">
+                <span className="rounded-none border border-[var(--line)] px-2 py-1">In ảnh 24h</span>
+                {categoryLabel(product.category_slug) && (
+                  <Link
+                    href={toHtmlPath(`/${product.category_slug}`)}
+                    className="rounded-none border border-[var(--line)] px-2 py-1 hover:text-[var(--accent-strong)]"
+                  >
+                    {categoryLabel(product.category_slug)}
+                  </Link>
+                )}
+                <Link
+                  href={toHtmlPath("/in-anh")}
+                  className="rounded-none border border-[var(--line)] px-2 py-1 hover:text-[var(--accent-strong)]"
+                >
+                  In ảnh lấy ngay
+                </Link>
+              </div>
 
               <div className="flex flex-wrap gap-3 pt-2">
                 <a href="#lien-he" className="ghost-button rounded-none px-5 py-3 text-sm font-semibold">
