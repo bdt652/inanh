@@ -283,14 +283,35 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
 
           {categoryMatch && displayProducts.length > 0 && (
             <section className="mt-10 border-t border-[var(--line)] pt-8">
-              <ProductGrid
-                header={categoryProducts.length > 0 ? `Sản phẩm ${categoryMatch.label}` : "Gợi ý nổi bật"}
-                subtitle={categoryProducts.length > 0 ? "Theo danh mục" : "Hiển thị sản phẩm nổi bật"}
-                highlight={`Tổng: ${displayProducts.length}`}
-                products={displayProducts}
-                viewMoreHref="/san-pham"
-                viewMoreLabel="Xem thêm sản phẩm"
-              />
+              <div className="grid gap-5 md:grid-cols-3">
+                {displayProducts.map((item, index) => (
+                  <article
+                    key={item.slug ?? item.id ?? item.title}
+                    className="panel reveal-up rounded-none p-5"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <div className="photo-frame mb-3 h-40 overflow-hidden">
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center bg-[var(--bg-soft)] text-sm text-[var(--text-soft)]">
+                          Không có ảnh
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-lg font-semibold leading-6">{item.title}</h3>
+                    <p className="mt-1 text-sm text-[var(--text-soft)] line-clamp-3">{item.short || item.description}</p>
+                    {item.slug || item.id ? (
+                      <a
+                        href={toHtmlPath(`/san-pham/${encodeURIComponent(item.slug ?? item.id ?? "")}`)}
+                        className="mt-3 inline-flex items-center text-sm font-semibold text-[var(--accent-strong)] underline"
+                      >
+                        Xem chi tiết
+                      </a>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
             </section>
           )}
         </article>
