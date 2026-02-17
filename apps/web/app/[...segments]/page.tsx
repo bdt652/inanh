@@ -5,7 +5,7 @@ import AmbientGlow from "../components/AmbientGlow";
 import FooterSection from "../components/FooterSection";
 import HeaderBar from "../components/HeaderBar";
 import ScrollProgress from "../components/ScrollProgress";
-import { getAllProducts, getCategories, getMenuItems, getPageByPath, getSiteSettings } from "../lib/api";
+import { getAllProducts, getBestSellers, getCategories, getMenuItems, getPageByPath, getSiteSettings } from "../lib/api";
 import type { ProductCard } from "../lib/content";
 import { normalizePath, stripHtmlSuffix, toHtmlPath } from "../lib/paths";
 
@@ -197,10 +197,11 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   }
   const path = toPath(segments);
 
-  const [settings, context, products] = await Promise.all([
+  const [settings, context, products, bestSellers] = await Promise.all([
     getSiteSettings(),
     resolveDynamicContext(path),
     getAllProducts(),
+    getBestSellers(6),
   ]);
   const { page, categories, menuItems, categoryMatch, menuMatch } = context;
 
@@ -240,6 +241,9 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
         })
       : [];
 
+  const fallbackProducts = bestSellers.length > 0 ? bestSellers : products;
+  const displayProducts = categoryProducts.length > 0 ? categoryProducts : fallbackProducts.slice(0, 8);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -276,14 +280,18 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
             />
           )}
 
-          {categoryMatch && categoryProducts.length > 0 && (
+          {categoryMatch && displayProducts.length > 0 && (
             <div className="mt-8">
               <h2 className="font-display text-2xl font-semibold md:text-3xl">
                 Bài viết/Sản phẩm trong danh mục {categoryMatch.label}
               </h2>
-              <p className="mt-2 text-sm text-[var(--text-soft)]">Tổng số: {categoryProducts.length}</p>
+              <p className="mt-2 text-sm text-[var(--text-soft)]">
+                {categoryProducts.length > 0
+                  ? `Tổng số: ${categoryProducts.length}`
+                  : "Chưa có mục nào gắn danh mục này, hiển thị gợi ý nổi bật."}
+              </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {categoryProducts.map((item) => (
+                {displayProducts.map((item) => (
                   <article key={item.slug ?? item.id ?? item.title} className="panel rounded-none p-4">
                     <h3 className="text-lg font-semibold">{item.title}</h3>
                     <p className="mt-1 text-sm text-[var(--text-soft)] line-clamp-3">{item.short || item.description}</p>
