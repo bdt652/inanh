@@ -211,8 +211,8 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   }
 
   const title = page?.title ?? categoryMatch?.label ?? menuMatch?.label ?? "Trang";
-  const summary = page?.summary ?? resolveFallbackSummary(categoryMatch?.label);
-  const content = page?.content ?? resolveFallbackContent(categoryMatch?.label);
+  const summary = page?.summary ?? "";
+  const content = page?.content ?? "";
   const renderedContent = resolveRenderableContent(content);
   const description = toMetaDescription(summary || content);
   const breadcrumb = buildBreadcrumb(path, title);
@@ -269,7 +269,6 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
       <main className="w-full pb-14 pt-8">
         <article className="panel-plain w-full rounded-none px-4 py-6 md:px-10 md:py-10">
           <h1 className="font-display text-4xl font-semibold md:text-5xl">{title}</h1>
-          {summary && <p className="mt-4 text-sm text-[var(--text-soft)] md:text-base">{summary}</p>}
           {categoryMatch?.img && (
             <div className="photo-frame mt-6 overflow-hidden rounded-none">
               <img src={categoryMatch.img} alt={categoryMatch.label} className="h-full max-h-[360px] w-full object-cover" />
