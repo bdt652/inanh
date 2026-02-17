@@ -204,10 +204,10 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
       const widthStyle = `width:${preferredWidth};`;
       const style =
         align === "center"
-          ? `${widthStyle}display:block;float:none;margin-left:auto;margin-right:auto;`
+          ? `${widthStyle}display:block;margin-left:auto;margin-right:auto;`
           : align === "left"
-            ? `${widthStyle}display:block;float:left;margin-right:12px;`
-            : `${widthStyle}display:block;float:right;margin-left:12px;`;
+            ? `${widthStyle}display:block;margin-left:0;margin-right:auto;`
+            : `${widthStyle}display:block;margin-left:auto;margin-right:0;`;
       editor
         .chain()
         .focus()

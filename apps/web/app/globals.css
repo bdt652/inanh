@@ -612,15 +612,14 @@ body::after {
   display: block;
   margin-left: auto;
   margin-right: auto;
-  float: none;
 }
 .tiptap-content img[data-align="left"] {
   display: block;
-  float: left;
-  margin-right: 12px;
+  margin-left: 0;
+  margin-right: auto;
 }
 .tiptap-content img[data-align="right"] {
   display: block;
-  float: right;
-  margin-left: 12px;
+  margin-left: auto;
+  margin-right: 0;
 }
