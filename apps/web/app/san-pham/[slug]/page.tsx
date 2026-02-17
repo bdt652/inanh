@@ -88,6 +88,15 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const hasSale = product.sale_price !== null && product.sale_price > 0 && product.sale_price < product.price;
   const effectivePrice = hasSale && product.sale_price !== null ? product.sale_price : product.price;
   const description = normalizeDescription(product.short_description, product.category_slug);
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Trang chủ", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Sản phẩm", item: productUrl("") },
+      { "@type": "ListItem", position: 3, name: product.name, item: productUrl(product.slug) },
+    ],
+  };
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -158,6 +167,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
 
       <FooterSection categories={categories} settings={siteSettings} />
     </div>
