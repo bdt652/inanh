@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+import type { Metadata } from "next";
+import Link from "next/link";
 
 import AmbientGlow from "../components/AmbientGlow";
 import FooterSection from "../components/FooterSection";
@@ -8,6 +9,26 @@ import ScrollProgress from "../components/ScrollProgress";
 import { getAllProducts, getCategories, getMenuItems, getSiteSettings } from "../lib/api";
 import type { ProductCard } from "../lib/content";
 import { toHtmlPath } from "../lib/paths";
+
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+
+export const metadata: Metadata = {
+  title: "Sản phẩm | In ảnh 24h",
+  description: "Danh sách sản phẩm in ảnh, ảnh gỗ, album ảnh với báo giá minh bạch tại In ảnh 24h.",
+  alternates: { canonical: "/san-pham" },
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    title: "Sản phẩm | In ảnh 24h",
+    description: "Xem toàn bộ sản phẩm và tìm kiếm nhanh theo từ khóa.",
+    url: `${SITE_URL}/san-pham`,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sản phẩm | In ảnh 24h",
+    description: "Xem toàn bộ sản phẩm và tìm kiếm nhanh theo từ khóa.",
+  },
+};
 
 type ProductsPageProps = {
   searchParams: Promise<{ q?: string | string[] }>;
@@ -51,6 +72,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
   const filteredProducts = query ? products.filter((item) => isMatchProduct(item, query)) : products;
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Sản phẩm",
+    description: "Danh sách sản phẩm tại In ảnh 24h",
+    url: `${SITE_URL}/san-pham`,
+    about: "In ảnh, ảnh gỗ, album ảnh, quà tặng in ấn",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_URL}/san-pham?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <div className="relative min-h-screen">
       <AmbientGlow />
@@ -62,7 +97,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <p>
               Kết quả tìm kiếm cho: <span className="font-semibold text-[var(--text-main)]">&quot;{query}&quot;</span>
             </p>
-            <Link href={toHtmlPath("/san-pham")} className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+            <Link
+              href={toHtmlPath("/san-pham")}
+              className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-strong)]"
+            >
               Xóa bộ lọc
             </Link>
           </div>
@@ -82,6 +120,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         )}
       </main>
       <FooterSection categories={categories} settings={siteSettings} />
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
     </div>
   );
 }
