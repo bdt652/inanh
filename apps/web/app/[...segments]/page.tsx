@@ -100,6 +100,14 @@ function resolveFallbackContent(categoryLabel?: string): string {
   return "Bạn có thể bổ sung nội dung trang này trong phần Pages để hiển thị thông tin đầy đủ cho người dùng và công cụ tìm kiếm.";
 }
 
+function normalizeToken(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function sanitizeHtml(rawHtml: string): string {
   return rawHtml
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
@@ -208,9 +216,28 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   const breadcrumb = buildBreadcrumb(path, title);
 
   const normalizedCategoryPath = categoryMatch ? normalizePath(categoryMatch.slug) : null;
+  const normalizedCategoryLabel = categoryMatch?.label
+    ? normalizePath(categoryMatch.label).replace(/\s+/g, "-")
+    : null;
   const categoryProducts: ProductCard[] =
     normalizedCategoryPath && products.length
-      ? products.filter((p) => normalizePath(p.category_slug ?? "") === normalizedCategoryPath)
+      ? products.filter((p) => {
+          const cat = normalizePath(p.category_slug ?? "");
+          const tagMatch = (p.tags ?? []).some((t) => {
+            const norm = normalizePath(t);
+            return norm === normalizedCategoryPath || norm === normalizedCategoryLabel;
+          });
+          const textMatch = (() => {
+            const labelNorm = normalizeToken(categoryMatch?.label ?? "");
+            if (!labelNorm) return false;
+            const hay = `${p.title ?? ""} ${p.short ?? ""} ${p.description ?? ""}`
+              .split(/\s+/)
+              .map(normalizeToken)
+              .join(" ");
+            return hay.includes(labelNorm);
+          })();
+          return cat === normalizedCategoryPath || tagMatch || textMatch;
+        })
       : [];
 
   const jsonLd = {
