@@ -38,19 +38,7 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
         "data-align": {
           default: null,
         },
-        caption: {
-          default: null,
-        },
       };
-    },
-    renderHTML({ HTMLAttributes }) {
-      const { caption, ...imgAttrs } = HTMLAttributes;
-      return [
-        "figure",
-        { class: "tiptap-figure" },
-        ["img", imgAttrs],
-        caption ? ["figcaption", { class: "tiptap-figcaption" }, caption] : "",
-      ];
     },
   });
 
@@ -233,14 +221,7 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
     });
 
   const setImageCaption = () =>
-    keepFocus(() => {
-      const target = resolveCurrentImage();
-      if (!target) return;
-      const { pos, node } = target;
-      const current = (node.attrs.caption as string | null) ?? "";
-      const next = window.prompt("Nhập chú thích ảnh", current) ?? current;
-      editor.chain().focus().setNodeSelection(pos).updateAttributes("image", { caption: next || null }).run();
-    });
+    keepFocus(() => {});
 
   return (
     <div className="space-y-2">
@@ -381,20 +362,17 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
                   {size}%
                 </button>
               ))}
-              <button type="button" className={iconButton()} onMouseDown={alignImage("left")}>
-                Trái
-              </button>
-              <button type="button" className={iconButton()} onMouseDown={alignImage("center")}>
-                Giữa
-              </button>
-              <button type="button" className={iconButton()} onMouseDown={alignImage("right")}>
-                Phải
-              </button>
-              <button type="button" className={iconButton()} onMouseDown={setImageCaption}>
-                Chú thích
-              </button>
-            </>
-          )}
+          <button type="button" className={iconButton()} onMouseDown={alignImage("left")}>
+            Trái
+          </button>
+          <button type="button" className={iconButton()} onMouseDown={alignImage("center")}>
+            Giữa
+          </button>
+          <button type="button" className={iconButton()} onMouseDown={alignImage("right")}>
+            Phải
+          </button>
+        </>
+      )}
           <input
             ref={fileInputRef}
             type="file"

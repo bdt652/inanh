@@ -624,16 +624,3 @@ body::after {
   float: right;
   margin-left: 12px;
 }
-.tiptap-figure {
-  margin: 0.75rem auto;
-  text-align: center;
-}
-.tiptap-figure img {
-  display: inline-block;
-}
-.tiptap-figcaption {
-  margin-top: 6px;
-  color: #6b7280;
-  font-size: 0.85rem;
-  line-height: 1.3;
-}
