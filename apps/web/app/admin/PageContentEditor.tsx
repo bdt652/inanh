@@ -9,10 +9,6 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
-import Table from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableCell from "@tiptap/extension-table-cell";
-import TableHeader from "@tiptap/extension-table-header";
 
 type PageContentEditorProps = {
   value: string;
@@ -67,13 +63,6 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
       Link.configure({ openOnClick: true, autolink: true }),
       CustomImage.configure({ inline: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Table.configure({
-        resizable: true,
-        HTMLAttributes: { class: "tiptap-table" },
-      }),
-      TableRow,
-      TableHeader,
-      TableCell,
     ],
     editorProps: {
       attributes: {
@@ -253,29 +242,6 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
       editor.chain().focus().setNodeSelection(pos).updateAttributes("image", { caption: next || null }).run();
     });
 
-  const insertPriceTable = () =>
-    keepFocus(() => {
-      const cell = (type: "tableHeader" | "tableCell", text: string) => ({
-        type,
-        content: [{ type: "paragraph", content: text ? [{ type: "text", text }] : [] }],
-      });
-      editor
-        .chain()
-        .focus()
-        .insertContent({
-          type: "table",
-          content: [
-            {
-              type: "tableRow",
-              content: [cell("tableHeader", "Hạng mục"), cell("tableHeader", "Quy cách"), cell("tableHeader", "Giá")],
-            },
-            { type: "tableRow", content: [cell("tableCell", ""), cell("tableCell", ""), cell("tableCell", "")] },
-            { type: "tableRow", content: [cell("tableCell", ""), cell("tableCell", ""), cell("tableCell", "")] },
-          ],
-        })
-        .run();
-    });
-
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -436,12 +402,6 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
             className="hidden"
             onChange={(event) => void handleFileChange(event.target.files)}
           />
-        </div>
-
-        <div className="flex flex-wrap gap-1">
-          <button type="button" className={iconButton()} onMouseDown={insertPriceTable}>
-            Thêm bảng giá
-          </button>
         </div>
       </div>
 
