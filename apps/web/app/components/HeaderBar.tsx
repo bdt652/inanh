@@ -4,13 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { getProfile, type UserProfile } from "../lib/customer-api";
 import type { MenuItem } from "../lib/content";
+import { useCustomerToken } from "../lib/use-customer-token";
 import { toHtmlPath } from "../lib/paths";
 
 type HeaderBarProps = {
   menuItems: MenuItem[];
   logoUrl?: string;
 };
+
+const STORAGE_KEY = "customerToken";
 
 export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
   const [hideSearch, setHideSearch] = useState(false);
@@ -19,6 +23,17 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
   const router = useRouter();
   const lastScroll = useRef(0);
   const hideRef = useRef(false);
+  const token = useCustomerToken();
+  const [hydrated, setHydrated] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+  const showAccountMenu = hydrated && Boolean(token);
 
   useEffect(() => {
     hideRef.current = hideSearch;
@@ -59,6 +74,58 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
+  useEffect(() => {
+    if (!token) {
+      setProfile(null);
+      setProfileLoading(false);
+      setProfileError("");
+      return;
+    }
+    let active = true;
+    setProfileLoading(true);
+    setProfileError("");
+    getProfile(token)
+      .then((data) => {
+        if (active) {
+          setProfile(data);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setProfileError(err instanceof Error ? err.message : "Không thể tải thông tin tài khoản.");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setProfileLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [menuOpen]);
+
   const onSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalized = query.trim();
@@ -69,7 +136,16 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
     router.push(`/san-pham?q=${encodeURIComponent(normalized)}`);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new Event("storage"));
+    setMenuOpen(false);
+    router.push("/dang-nhap");
+  };
+
   const searchClass = hideSearch ? "header-search header-search--hidden" : "header-search";
+  const accountLabel = profile?.phone || "Tài khoản";
+  const accountSubtitle = profile?.email || "Chưa cập nhật";
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-sm">
@@ -92,10 +168,84 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
                 {item.label}
               </Link>
             ))}
+            {showAccountMenu ? (
+              <div ref={menuRef} className="relative z-50">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/80 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-soft)] shadow-sm transition hover:shadow-md"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[0.65rem] font-bold text-[var(--accent-strong)]">
+                    KH
+                  </span>
+                  <span className="flex flex-col items-start leading-tight">
+                    <span className="text-[0.55rem] uppercase tracking-[0.24em] text-[var(--text-soft)]">Tài khoản</span>
+                    <span className="text-sm font-semibold normal-case text-[var(--text-main)]">
+                      {profileLoading ? "Đang tải..." : accountLabel}
+                    </span>
+                  </span>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+
+                {menuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-3 w-64 rounded-2xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_18px_40px_rgba(0,0,0,0.15)] backdrop-blur-sm z-50"
+                  >
+                    <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-xs uppercase tracking-[0.24em] text-[var(--text-soft)]">
+                      <p className="text-[0.7rem] font-semibold normal-case text-[var(--text-main)]">{accountLabel}</p>
+                      <p className="mt-1 text-[0.65rem] normal-case text-[var(--text-soft)]">{accountSubtitle}</p>
+                      {profileError && <p className="mt-1 text-[0.65rem] normal-case text-red-600">{profileError}</p>}
+                    </div>
+                    <div className="mt-2 grid gap-1 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-soft)]">
+                      <Link
+                        href="/quan-ly-don-hang/cart"
+                        onClick={() => setMenuOpen(false)}
+                        className="rounded-xl px-4 py-2 transition hover:bg-[var(--accent-soft)]/60"
+                      >
+                        Giỏ hàng
+                      </Link>
+                      <Link
+                        href="/quan-ly-don-hang/orders"
+                        onClick={() => setMenuOpen(false)}
+                        className="rounded-xl px-4 py-2 transition hover:bg-[var(--accent-soft)]/60"
+                      >
+                        Đơn hàng
+                      </Link>
+                      <Link
+                        href="/quan-ly-don-hang/profile"
+                        onClick={() => setMenuOpen(false)}
+                        className="rounded-xl px-4 py-2 transition hover:bg-[var(--accent-soft)]/60"
+                      >
+                        Thông tin cá nhân
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="rounded-xl px-4 py-2 text-left text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]/60"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                href={toHtmlPath("/dang-nhap")}
+                className="rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm hover:brightness-110"
+              >
+                Đăng nhập
+              </Link>
+            )}
           </nav>
         </div>
 
-        <form className={searchClass} aria-hidden={hideSearch} onSubmit={onSearchSubmit}>
+        <form className={`${searchClass} relative z-10`} aria-hidden={hideSearch} onSubmit={onSearchSubmit}>
           <label className="search-field">
             <span className="sr-only">Tìm kiếm sản phẩm</span>
             <svg
