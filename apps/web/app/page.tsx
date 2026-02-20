@@ -1,4 +1,6 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
+
+export const dynamic = "force-dynamic";
 
 import AmbientGlow from "./components/AmbientGlow";
 import BannerSlider from "./components/BannerSlider";
@@ -19,11 +21,20 @@ import {
 } from "./lib/api";
 import { toHtmlPath } from "./lib/paths";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
 const SITE_NAME = "In ảnh 24h";
 
+async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    console.warn("Fallback data used due to fetch error:", error);
+    return fallback;
+  }
+}
+
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSiteSettings();
+  const settings = await safe(getSiteSettings, null);
   const title = settings?.site_title || "In ảnh 24h - In nhanh, đúng màu";
   const description =
     settings?.site_description ||
@@ -54,12 +65,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   const [menuItems, heroStatements, categories, bestSellers, banners, siteSettings] = await Promise.all([
-    getMenuItems(),
-    getHeroStatements(),
-    getCategories(),
-    getBestSellers(),
-    getBanners(),
-    getSiteSettings(),
+    safe(getMenuItems, []),
+    safe(getHeroStatements, []),
+    safe(getCategories, []),
+    safe(getBestSellers, []),
+    safe(getBanners, []),
+    safe(getSiteSettings, null),
   ]);
 
   const searchUrl = `${SITE_URL}/san-pham`;
@@ -78,6 +89,34 @@ export default async function Home() {
       name: SITE_NAME,
       logo: siteSettings?.logo_url ? { "@type": "ImageObject", url: siteSettings.logo_url } : undefined,
     },
+  };
+  const howToJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: "Quy trình đặt in ảnh tại In ảnh 24h",
+    description: "Gửi file, duyệt màu nhanh và in giao trong 24h.",
+    step: [
+      {
+        "@type": "HowToStep",
+        name: "Gửi file",
+        text: "Bạn gửi file qua Zalo/Email hoặc form Liên hệ, nêu khổ in và vật liệu.",
+      },
+      {
+        "@type": "HowToStep",
+        name: "Duyệt màu",
+        text: "Kỹ thuật so khớp màu với file gốc/palette, gửi bạn duyệt nhanh.",
+      },
+      {
+        "@type": "HowToStep",
+        name: "In và giao 24h",
+        text: "In theo lịch đã xác nhận, đóng gói và giao tận nơi đúng hẹn.",
+      },
+    ],
+    supply: [
+      { "@type": "HowToSupply", name: "File ảnh gốc" },
+      { "@type": "HowToSupply", name: "Yêu cầu khổ in/vật liệu" },
+    ],
+    tool: [{ "@type": "HowToTool", name: "Máy in ảnh chuyên dụng" }],
   };
 
   return (
@@ -101,7 +140,7 @@ export default async function Home() {
         </RevealSection>
         <RevealSection delay={350}>
           <ProductGrid
-            header="Sản phẩm nổi bật"
+            header=""
             subtitle="Sản phẩm nổi bật"
             highlight="Sale!"
             products={bestSellers}
@@ -113,6 +152,8 @@ export default async function Home() {
       <FooterSection categories={categories} settings={siteSettings} />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(howToJsonLd) }} />
     </div>
   );
 }
+
