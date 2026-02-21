@@ -14,6 +14,9 @@ type Product = {
   image_url?: string;
   highlight?: string;
   tags?: string[];
+  allow_online_order?: boolean;
+  min_images?: number | null;
+  max_images?: number | null;
 };
 
 type ProductGridProps = {
@@ -95,6 +98,11 @@ export default function ProductGrid({
                 {item.highlight && (
                   <span className="inline-flex items-center justify-center rounded-none border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.3em] text-[var(--accent-strong)]">
                     {item.highlight}
+                  </span>
+                )}
+                {item.allow_online_order === false && (
+                  <span className="mt-2 inline-flex items-center justify-center rounded-none border border-amber-200 bg-amber-50 px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.3em] text-amber-800">
+                    Chỉ Zalo
                   </span>
                 )}
 

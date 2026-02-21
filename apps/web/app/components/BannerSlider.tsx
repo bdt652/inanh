@@ -106,6 +106,7 @@ export default function BannerSlider({ slides }: BannerSliderProps) {
               alt={slide.alt}
               className="h-full w-full object-cover"
               loading={slideIndex === 0 ? "eager" : "lazy"}
+              fetchPriority={slideIndex === 0 ? "high" : "auto"}
               draggable={false}
             />
           </div>

@@ -10,7 +10,9 @@ import { getAllProducts, getCategories, getMenuItems, getSiteSettings } from "..
 import type { ProductCard } from "../lib/content";
 import { toHtmlPath } from "../lib/paths";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+export const dynamic = "force-dynamic";
+
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
 
 export const metadata: Metadata = {
   title: "Sản phẩm | In ảnh 24h",

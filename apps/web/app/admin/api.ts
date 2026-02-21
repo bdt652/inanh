@@ -17,11 +17,9 @@
   SettingsUpsert,
 } from "./types";
 
-const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/, "");
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL ??
-  (backendBase ? `${backendBase}/api/v1` : "http://localhost:8000/api/v1")
-).replace(/\/+$/, "");
+import { resolveApiBase } from "../lib/api-base";
+
+const API_BASE = resolveApiBase();
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE";

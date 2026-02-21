@@ -1,9 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useRef, useState } from "react";
+import { forwardRef, useMemo, useRef, useState } from "react";
+import type ReactQuillType from "react-quill";
+import type { ReactQuillProps } from "react-quill";
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(
+  async () => {
+    const { default: RQ } = await import("react-quill");
+    return forwardRef<ReactQuillType, ReactQuillProps>((props, ref) => <RQ ref={ref} {...props} />);
+  },
+  { ssr: false }
+);
+type ReactQuillComponent = ReactQuillType;
 import "react-quill/dist/quill.snow.css";
 
 type QuillContentEditorProps = {
@@ -14,7 +23,7 @@ type QuillContentEditorProps = {
 };
 
 export default function QuillContentEditor({ value, onChange, onUploadImage, placeholder }: QuillContentEditorProps) {
-  const quillRef = useRef<ReactQuill | null>(null);
+  const quillRef = useRef<ReactQuillComponent | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -56,8 +65,18 @@ export default function QuillContentEditor({ value, onChange, onUploadImage, pla
         ],
         handlers: {
           image: openFilePicker,
-          undo: () => quillRef.current?.getEditor().history.undo(),
-          redo: () => quillRef.current?.getEditor().history.redo(),
+          undo: () => {
+            const history = quillRef.current?.getEditor().getModule("history") as
+              | { undo: () => void }
+              | undefined;
+            history?.undo();
+          },
+          redo: () => {
+            const history = quillRef.current?.getEditor().getModule("history") as
+              | { redo: () => void }
+              | undefined;
+            history?.redo();
+          },
         },
       },
       history: { delay: 500, maxStack: 100 },

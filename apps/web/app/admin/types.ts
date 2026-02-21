@@ -43,6 +43,10 @@ export type ProductRecord = {
   order: number;
   is_active: boolean;
   is_featured: boolean;
+  extra_options: string[];
+  allow_online_order: boolean;
+  min_images?: number | null;
+  max_images?: number | null;
 };
 
 export type PageRecord = {
@@ -73,6 +77,10 @@ export type SettingsRecord = {
   address: string;
   hotline_zalo: string;
   email: string;
+  upload_min_files?: number | null;
+  upload_max_files?: number | null;
+  upload_max_bytes?: number | null;
+  upload_require_verified_phone_threshold?: number | null;
 };
 
 export type MenuUpsert = {
@@ -106,6 +114,10 @@ export type ProductUpsert = {
   order: number;
   is_active: boolean;
   is_featured: boolean;
+  extra_options: string[];
+  allow_online_order: boolean;
+  min_images?: number | null;
+  max_images?: number | null;
 };
 
 export type PageUpsert = {
@@ -133,4 +145,8 @@ export type SettingsUpsert = {
   address: string;
   hotline_zalo: string;
   email: string;
+  upload_min_files?: number | null;
+  upload_max_files?: number | null;
+  upload_max_bytes?: number | null;
+  upload_require_verified_phone_threshold?: number | null;
 };

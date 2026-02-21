@@ -6,3 +6,4 @@ ruff
 pytest
 httpx
 minio
+python-multipart

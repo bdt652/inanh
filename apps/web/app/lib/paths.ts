@@ -6,15 +6,6 @@ export function normalizePath(rawPath: string): string {
   return withLeadingSlash.replace(/\/+$/, "") || "/";
 }
 
-function isAppNativePath(normalizedPath: string): boolean {
-  return (
-    normalizedPath === "/san-pham" ||
-    normalizedPath.startsWith("/san-pham/") ||
-    normalizedPath === "/admin" ||
-    normalizedPath.startsWith("/admin/")
-  );
-}
-
 export function stripHtmlSuffix(rawPath: string): string {
   const normalized = normalizePath(rawPath);
   if (normalized !== "/" && normalized.toLowerCase().endsWith(".html")) {
@@ -27,6 +18,5 @@ export function stripHtmlSuffix(rawPath: string): string {
 export function toHtmlPath(rawPath: string): string {
   const normalized = stripHtmlSuffix(rawPath);
   if (normalized === "/") return "/";
-  if (isAppNativePath(normalized)) return normalized;
   return `${normalized}.html`;
 }

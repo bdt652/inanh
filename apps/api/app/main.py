@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.api.v1.routes import router as v1_router
 from app.api.v1.schemas import HealthResponse
+from app.core.config import settings
 from app.core.storage import StorageUnavailableError, ensure_storage_ready, load_object_bytes
 from app.core.uploads import UPLOADS_ROUTE_PREFIX
 from app.db.mongo import ensure_indexes, get_db, ping_database
@@ -47,7 +48,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

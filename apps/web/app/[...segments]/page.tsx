@@ -11,7 +11,7 @@ import type { ProductCard } from "../lib/content";
 import { normalizePath, stripHtmlSuffix, toHtmlPath } from "../lib/paths";
 
 const SITE_NAME = "In ảnh 24h";
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,7 @@ function resolveLegacyRedirect(rawPath: string): string | null {
   if (lowered === "/san-pham.html") return "/san-pham";
   if (lowered.startsWith("/san-pham/") && lowered.endsWith(".html")) return rawPath.slice(0, -5);
   if (lowered === "/admin.html") return "/admin";
+  if (lowered.startsWith("/admin/") && lowered.endsWith(".html")) return rawPath.slice(0, -5);
   return null;
 }
 

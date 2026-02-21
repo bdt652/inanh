@@ -1,12 +1,9 @@
 import type { MetadataRoute } from "next";
 import { normalizePath, toHtmlPath } from "./lib/paths";
+import { resolveApiBase } from "./lib/api-base";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
-const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/, "");
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL ??
-  (backendBase ? `${backendBase}/api/v1` : "http://localhost:8000/api/v1")
-).replace(/\/+$/, "");
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
+const API_BASE = resolveApiBase();
 
 type MenuItem = { path: string };
 type Category = { slug: string };
@@ -28,7 +25,7 @@ async function safeFetchList<T>(path: string): Promise<T[]> {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const staticPaths = ["/in-anh"];
+  const staticPaths = ["/san-pham"];
   const [menuItems, categories, products] = await Promise.all([
     safeFetchList<MenuItem>("/menu"),
     safeFetchList<Category>("/categories"),

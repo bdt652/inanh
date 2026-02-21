@@ -1,0 +1,16 @@
+node_modules
+.pnpm-store
+.next
+.git
+.gitignore
+*.log
+apps/api/.venv
+apps/api/__pycache__
+apps/api/app/__pycache__
+apps/api/app/**/__pycache__
+apps/web/node_modules
+apps/web/.next
+apps/web/.turbo
+dist
+tmp
+deploy/*.tar

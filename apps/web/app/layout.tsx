@@ -2,11 +2,11 @@
 import "./globals.css";
 
 function resolveMetadataBase(): URL {
-  const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+  const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://inanh24h.com";
   try {
     return new URL(rawSiteUrl);
   } catch {
-    return new URL("http://localhost:3000");
+    return new URL("https://inanh24h.com");
   }
 }
 
@@ -54,6 +54,35 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const siteUrl = resolveMetadataBase().toString().replace(/\/+$/, "");
+  const analyticsJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "In ảnh 24h",
+    url: siteUrl,
+  };
+  const serviceJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: "Dịch vụ in ảnh 24h",
+    provider: {
+      "@type": "Organization",
+      name: "In ảnh 24h",
+      url: siteUrl,
+      logo: `${siteUrl}/Inanh/logo_inanh24h.jpg`,
+    },
+    areaServed: {
+      "@type": "AdministrativeArea",
+      name: "Hà Nội, Việt Nam",
+    },
+    url: siteUrl,
+    serviceType: "In ảnh lấy ngay, in ảnh gỗ, album ảnh",
+    availableChannel: {
+      "@type": "ServiceChannel",
+      serviceUrl: `${siteUrl}/lien-he`,
+      availableLanguage: ["vi-VN"],
+      name: "Đặt in trực tuyến",
+    },
+  };
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -77,6 +106,8 @@ export default function RootLayout({
       <body className="antialiased">
         {children}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(analyticsJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
       </body>
     </html>
   );

@@ -10,7 +10,11 @@ import { getCategories, getMenuItems, getProductDetail, getSiteSettings } from "
 import { toHtmlPath } from "../../lib/paths";
 import ProductImageGallery from "./ProductImageGallery";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
+const ZALO_URL = "https://zalo.me/0877226644";
+const LOGIN_URL = toHtmlPath("/dang-nhap");
+
+export const dynamic = "force-dynamic";
 
 type ProductDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -46,6 +50,9 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
   }
 
   const description = normalizeDescription(product.short_description, product.category_slug);
+  const allowOnlineOrder = product.allow_online_order !== false;
+  const minImages = product.min_images ?? null;
+  const maxImages = product.max_images ?? null;
   const title = `${product.name} | In ảnh 24h`;
   const image = product.image_url || product.image_urls[0] || "";
   const url = productUrl(product.slug);
@@ -88,6 +95,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const hasSale = product.sale_price !== null && product.sale_price > 0 && product.sale_price < product.price;
   const effectivePrice = hasSale && product.sale_price !== null ? product.sale_price : product.price;
   const description = normalizeDescription(product.short_description, product.category_slug);
+  const allowOnlineOrder = product.allow_online_order !== false;
+  const minImages = product.min_images ?? null;
+  const maxImages = product.max_images ?? null;
   const breadcrumb = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -153,6 +163,13 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               </div>
 
               <p className="text-sm leading-7 text-[var(--text-soft)]">{description}</p>
+              {(minImages || maxImages) && (
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-soft)]">
+                  Gioi han anh:{" "}
+                  {minImages ? `toi thieu ${minImages}` : "khong gioi han toi thieu"}
+                  {maxImages ? `, toi da ${maxImages}` : ""}.
+                </p>
+              )}
 
               <div className="flex flex-wrap gap-2 pt-3 text-xs uppercase tracking-[0.18em] text-[var(--text-soft)]">
                 <span className="rounded-none border border-[var(--line)] px-2 py-1">In ảnh 24h</span>
@@ -173,15 +190,32 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               </div>
 
               <div className="flex flex-wrap gap-3 pt-2">
-                <a href="#lien-he" className="ghost-button rounded-none px-5 py-3 text-sm font-semibold">
-                  Liên hệ báo giá
-                </a>
                 <Link
                   href={toHtmlPath("/san-pham")}
                   className="rounded-none border border-[var(--line)] px-5 py-3 text-sm font-semibold text-[var(--text-soft)] hover:bg-white"
                 >
                   Xem sản phẩm khác
                 </Link>
+                {allowOnlineOrder ? (
+                  <a
+                    href={LOGIN_URL}
+                    className="rounded-none bg-[var(--accent-strong)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-sm hover:brightness-110"
+                  >
+                    {"\u0110\u0103ng nh\u1eadp \u0111\u1ec3 \u0111\u1eb7t h\u00e0ng"}
+                  </a>
+                ) : (
+                  <div className="rounded-none border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-amber-900">
+                    {"Ch\u1ec9 nh\u1eadn \u0111\u1eb7t qua Zalo"}
+                  </div>
+                )}
+                <a
+                  href={ZALO_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-none border border-[var(--accent-strong)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--accent-strong)] hover:bg-[var(--accent-soft)]"
+                >
+                  Nhắn Zalo báo giá
+                </a>
               </div>
             </section>
           </div>

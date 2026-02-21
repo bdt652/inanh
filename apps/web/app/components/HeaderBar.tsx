@@ -34,6 +34,7 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
     setHydrated(true);
   }, []);
   const showAccountMenu = hydrated && Boolean(token);
+  const authReady = hydrated;
 
   useEffect(() => {
     hideRef.current = hideSearch;
@@ -168,7 +169,12 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
                 {item.label}
               </Link>
             ))}
-            {showAccountMenu ? (
+            {!authReady ? (
+              <div
+                aria-hidden="true"
+                className="h-10 w-[140px] rounded-full border border-[var(--line)] bg-white/70 shadow-sm"
+              />
+            ) : showAccountMenu ? (
               <div ref={menuRef} className="relative z-50">
                 <button
                   type="button"

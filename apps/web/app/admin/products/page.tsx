@@ -22,6 +22,10 @@ const EMPTY_FORM: ProductUpsert = {
   order: 0,
   is_active: true,
   is_featured: false,
+  extra_options: [],
+  allow_online_order: true,
+  min_images: null,
+  max_images: null,
 };
 
 function sortByOrder(items: ProductRecord[]): ProductRecord[] {
@@ -107,6 +111,10 @@ export default function AdminProductsPage() {
       order: item.order,
       is_active: item.is_active,
       is_featured: item.is_featured,
+      extra_options: item.extra_options ?? [],
+      allow_online_order: item.allow_online_order ?? true,
+      min_images: item.min_images ?? null,
+      max_images: item.max_images ?? null,
     });
     setImagesText(toImageText(item.image_urls));
     setEditId(item.id);
@@ -121,6 +129,13 @@ export default function AdminProductsPage() {
     setNotice("");
     try {
       const imageUrls = toImageList(imagesText);
+      const normalizedOptions = Array.from(
+        new Set(
+          (form.extra_options ?? [])
+            .map((option) => option.trim())
+            .filter((option) => option)
+        )
+      );
       const payload: ProductUpsert = {
         ...form,
         slug: slugify(form.slug || form.name),
@@ -130,6 +145,9 @@ export default function AdminProductsPage() {
         image_urls: imageUrls,
         image_url: imageUrls[0] ?? "",
         order: Math.max(0, form.order),
+        extra_options: normalizedOptions,
+        min_images: form.min_images ?? null,
+        max_images: form.max_images ?? null,
       };
       if (!payload.name.trim() || !payload.slug.trim() || !payload.category_slug.trim()) {
         setError("Ten, slug va category_slug la bat buoc.");
@@ -234,6 +252,11 @@ export default function AdminProductsPage() {
                     <p className="truncate text-xs text-stone-500">
                       {item.slug} · {item.category_slug} · order {item.order}
                     </p>
+                    {item.allow_online_order === false && (
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-700">
+                        Chi nhan Zalo
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">

@@ -26,6 +26,10 @@ export type ProductCard = {
   image_url?: string;
   highlight?: string;
   tags?: string[];
+  extra_options?: string[];
+  allow_online_order?: boolean;
+  min_images?: number | null;
+  max_images?: number | null;
 };
 
 export type ProductDetail = {
@@ -38,6 +42,9 @@ export type ProductDetail = {
   image_url: string;
   image_urls: string[];
   short_description: string;
+  allow_online_order?: boolean;
+  min_images?: number | null;
+  max_images?: number | null;
 };
 
 export type Banner = {
@@ -50,9 +57,15 @@ export type SiteSetting = {
   google_header: string;
   footer: string;
   title: string;
+  site_title?: string;
+  site_description?: string;
   address: string;
   hotline_zalo: string;
   email: string;
+  upload_min_files?: number | null;
+  upload_max_files?: number | null;
+  upload_max_bytes?: number | null;
+  upload_require_verified_phone_threshold?: number | null;
 };
 
 export type DynamicPage = {

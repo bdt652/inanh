@@ -129,7 +129,27 @@ def _serialize_site_setting(doc: dict) -> SiteSettingRecord:
         address=str(doc.get("address", "")),
         hotline_zalo=str(doc.get("hotline_zalo", "")),
         email=str(doc.get("email", "")),
+        upload_min_files=int(doc.get("upload_min_files")) if doc.get("upload_min_files") is not None else None,
+        upload_max_files=int(doc.get("upload_max_files")) if doc.get("upload_max_files") is not None else None,
+        upload_max_bytes=int(doc.get("upload_max_bytes")) if doc.get("upload_max_bytes") is not None else None,
+        upload_require_verified_phone_threshold=int(doc.get("upload_require_verified_phone_threshold"))
+        if doc.get("upload_require_verified_phone_threshold") is not None
+        else None,
     )
+
+
+def _resolve_allow_online_order(doc: dict) -> bool:
+    raw_value = doc.get("allow_online_order")
+    if raw_value is None:
+        return True
+    return bool(raw_value)
+
+
+def _resolve_optional_int(doc: dict, key: str) -> int | None:
+    raw_value = doc.get(key)
+    if raw_value is None:
+        return None
+    return int(raw_value)
 
 
 def _resolve_product_images(doc: dict) -> list[str]:
@@ -159,6 +179,10 @@ def _serialize_product(doc: dict) -> ProductRecord:
         order=int(doc.get("order", 0)),
         is_active=bool(doc.get("is_active", True)),
         is_featured=bool(doc.get("is_featured", False)),
+        extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
+        allow_online_order=_resolve_allow_online_order(doc),
+        min_images=_resolve_optional_int(doc, "min_images"),
+        max_images=_resolve_optional_int(doc, "max_images"),
     )
 
 

@@ -23,6 +23,12 @@ apps/api/tests/.tmp-upload-test/
 .env.*
 !.env.example
 
+# Deploy artifacts
+deploy/*.tar
+
+# Cloudflare tunnel
+deploy/cloudflared/credentials.json
+
 # Editor/OS
 .idea/
 .vscode/

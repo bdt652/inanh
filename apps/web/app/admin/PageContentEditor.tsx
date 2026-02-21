@@ -102,7 +102,8 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
   useEffect(() => {
     if (!editor) return;
     if (editor.getHTML().trim() === value.trim()) return;
-    editor.commands.setContent(value, false);
+    // Don't trigger onUpdate recursion when syncing controlled value
+    editor.commands.setContent(value, { emitUpdate: false });
   }, [value, editor]);
 
   // Theo dõi selection để biết khi nào đang chọn ảnh
@@ -173,7 +174,8 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
     handler();
   };
 
-  const toggleHeading = (level: 2 | 3 | 4) =>
+  const headingLevels = [2, 3, 4] as const;
+  const toggleHeading = (level: (typeof headingLevels)[number]) =>
     keepFocus(() => editor.chain().focus().toggleHeading({ level }).run());
 
   const setImageWidth = (percent: number) =>
@@ -276,7 +278,7 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
         </div>
 
         <div className="flex flex-wrap gap-1">
-          {[2, 3, 4].map((level) => (
+          {headingLevels.map((level) => (
             <button
               key={level}
               type="button"

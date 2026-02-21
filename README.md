@@ -19,6 +19,20 @@ Copy-Item .env.example .env
 docker compose up -d
 ```
 
+### Triển khai production (copy/paste)
+- Thư mục `deploy/` chứa sẵn `compose.yml` và `.env.prod.example` tối ưu cho domain thật (`inanh24h.com`, `api.inanh24h.com`).
+- Trên server: copy toàn bộ repo, `cd deploy`, tạo `.env` từ mẫu, rồi `docker compose -f compose.yml up -d --build`.
+- Volumes đặt tên (`mongo-data`, `minio-data`, `api-uploads`) đảm bảo không mất dữ liệu khi redeploy.
+
+## Docker (đóng gói & chạy trên máy chủ)
+- Các service chạy trong container: `web` (Next.js, port 3000), `api` (FastAPI, port 8000), `mongo` (27017), `minio` (9000, console 9001).
+- Dữ liệu được giữ bằng các volume đặt tên: `mongo-data`, `minio-data`, `api-uploads` (lưu file nếu `STORAGE_BACKEND=local`); update/redeploy sẽ không xoá dữ liệu.
+- Triển khai:
+  1. Sao chép repo, tạo `.env` từ `.env.example` và điều chỉnh biến (ít nhất `ADMIN_TOKEN_SECRET`, domain API nếu dùng reverse proxy).
+  2. Build & khởi động: `docker compose up -d --build`.
+  3. Truy cập: web `http://localhost:3000`, API `http://localhost:8000`, MinIO console `http://localhost:9001`.
+- Nâng cấp phiên bản: pull/replace mã nguồn mới, giữ nguyên `.env` và các volume, sau đó `docker compose up -d --build` (containers mới dùng lại volume -> không mất dữ liệu).
+
 3) Backend (FastAPI):
 ```powershell
 cd apps/api
@@ -41,15 +55,39 @@ pnpm dev
 
 Required environment variables:
 ```env
+MONGODB_URI=mongodb://mongo:27017
+DB_NAME=inanh24h
 ADMIN_TOKEN_SECRET=change-this-secret
 ADMIN_TOKEN_TTL_SECONDS=86400
-STORAGE_BACKEND=minio
-MINIO_ENDPOINT=http://localhost:9000
+CUSTOMER_TOKEN_SECRET=change-this-customer-secret
+CUSTOMER_TOKEN_TTL_SECONDS=604800
+GOOGLE_CLIENT_ID=
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+SMS_PROVIDER_URL=
+SMS_PROVIDER_TOKEN=
+SMS_SENDER_ID=InAnh24h
+PHONE_OTP_TTL_SECONDS=300
+PHONE_OTP_DEBUG=false
+UPLOAD_MIN_FILES=1
+UPLOAD_MAX_FILES=10000
+UPLOAD_MAX_BYTES=20000000000
+UPLOAD_REQUIRE_VERIFIED_PHONE_THRESHOLD=100
+STORAGE_BACKEND=minio # hoặc local nếu muốn lưu file trên đĩa container (volume api-uploads)
+MINIO_ENDPOINT=http://minio:9000
 MINIO_ROOT_USER=minio
 MINIO_ROOT_PASSWORD=minio123
 MINIO_BUCKET_NAME=inanh24h-media
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+API_INTERNAL_URL=http://api:8000/api/v1
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_SITE_URL=https://inanh24h.com
 ```
+
+### Luồng đăng nhập khách hàng & tải nhiều ảnh
+- Đăng ký/đăng nhập bằng số điện thoại + mật khẩu (`/api/v1/auth/register`, `/api/v1/auth/login`); OTP theo `PHONE_OTP_*` (dev có thể bật `PHONE_OTP_DEBUG=true`).
+- Đăng nhập Google qua `/api/v1/auth/google` (cần `GOOGLE_CLIENT_ID`).
+- Nếu bật Google login trên web, cung cấp `NEXT_PUBLIC_GOOGLE_CLIENT_ID` và cấu hình SMS (`SMS_PROVIDER_URL`, `SMS_PROVIDER_TOKEN`, `SMS_SENDER_ID`) để gửi OTP khi cần xác thực số điện thoại.
+- Tải ảnh số lượng lớn bằng phiên upload: tạo phiên `/api/v1/uploads/sessions`, nhận presigned URL, hoàn tất batch, rồi `/finalize`. Ngưỡng bắt buộc xác thực số điện thoại điều chỉnh qua `UPLOAD_REQUIRE_VERIFIED_PHONE_THRESHOLD` hoặc trong trang Admin Settings.
 
 ## API Endpoints
 - `GET /health` -> health check with MongoDB ping (returns `503` when DB unreachable)

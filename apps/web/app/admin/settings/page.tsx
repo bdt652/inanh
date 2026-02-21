@@ -18,6 +18,10 @@ const EMPTY_FORM: SettingsUpsert = {
   address: "",
   hotline_zalo: "",
   email: "",
+  upload_min_files: undefined,
+  upload_max_files: undefined,
+  upload_max_bytes: undefined,
+  upload_require_verified_phone_threshold: undefined,
 };
 
 export default function AdminSettingsPage() {
@@ -45,6 +49,10 @@ export default function AdminSettingsPage() {
           address: settings.address,
           hotline_zalo: settings.hotline_zalo,
           email: settings.email,
+          upload_min_files: settings.upload_min_files ?? undefined,
+          upload_max_files: settings.upload_max_files ?? undefined,
+          upload_max_bytes: settings.upload_max_bytes ?? undefined,
+          upload_require_verified_phone_threshold: settings.upload_require_verified_phone_threshold ?? undefined,
         });
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc cai dat."))
@@ -67,6 +75,10 @@ export default function AdminSettingsPage() {
         address: saved.address,
         hotline_zalo: saved.hotline_zalo,
         email: saved.email,
+        upload_min_files: saved.upload_min_files ?? undefined,
+        upload_max_files: saved.upload_max_files ?? undefined,
+        upload_max_bytes: saved.upload_max_bytes ?? undefined,
+        upload_require_verified_phone_threshold: saved.upload_require_verified_phone_threshold ?? undefined,
       });
       setNotice("Da luu cai dat.");
       setModalOpen(false);
@@ -190,6 +202,74 @@ export default function AdminSettingsPage() {
               value={form.hotline_zalo}
               onChange={(event) => setForm((prev) => ({ ...prev, hotline_zalo: event.target.value }))}
               required
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            Toi thieu so anh / don
+            <input
+              type="number"
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              value={form.upload_min_files ?? ""}
+              min={1}
+              max={50000}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  upload_min_files: event.target.value ? Number(event.target.value) : undefined,
+                }))
+              }
+              placeholder="VD 5"
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            Gioi han so anh / don
+            <input
+              type="number"
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              value={form.upload_max_files ?? ""}
+              min={1}
+              max={50000}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  upload_max_files: event.target.value ? Number(event.target.value) : undefined,
+                }))
+              }
+              placeholder="VD 10000"
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            Gioi han dung luong (bytes)
+            <input
+              type="number"
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              value={form.upload_max_bytes ?? ""}
+              min={1}
+              max={200000000000}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  upload_max_bytes: event.target.value ? Number(event.target.value) : undefined,
+                }))
+              }
+              placeholder="VD 20000000000"
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-stone-700 md:col-span-2">
+            Yeu cau xac thuc so dien thoai khi so anh &gt;=
+            <input
+              type="number"
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              value={form.upload_require_verified_phone_threshold ?? ""}
+              min={1}
+              max={50000}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  upload_require_verified_phone_threshold: event.target.value ? Number(event.target.value) : undefined,
+                }))
+              }
+              placeholder="VD 100"
             />
           </label>
         </form>

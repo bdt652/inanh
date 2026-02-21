@@ -19,26 +19,34 @@ def _b64url_decode(raw: str) -> bytes:
     return base64.urlsafe_b64decode(raw + padding)
 
 
-def create_access_token(subject: str) -> tuple[str, int]:
+def _build_jwt(subject: str, secret: str, ttl_seconds: int) -> tuple[str, int]:
     now = int(time.time())
-    expires_at = now + settings.admin_token_ttl_seconds
+    expires_at = now + ttl_seconds
     header = {"alg": "HS256", "typ": "JWT"}
     payload = {"sub": subject, "iat": now, "exp": expires_at}
     header_b64 = _b64url_encode(json.dumps(header, separators=(",", ":"), ensure_ascii=True).encode("utf-8"))
     payload_b64 = _b64url_encode(json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8"))
     signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
-    signature = hmac.new(settings.admin_token_secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    signature = hmac.new(secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
     token = f"{header_b64}.{payload_b64}.{_b64url_encode(signature)}"
     return token, expires_at
 
 
-def verify_access_token(token: str) -> dict:
+def create_access_token(subject: str) -> tuple[str, int]:
+    return _build_jwt(subject, settings.admin_token_secret, settings.admin_token_ttl_seconds)
+
+
+def create_customer_token(subject: str) -> tuple[str, int]:
+    return _build_jwt(subject, settings.customer_token_secret, settings.customer_token_ttl_seconds)
+
+
+def _verify_jwt(token: str, secret: str) -> dict:
     parts = token.split(".")
     if len(parts) != 3:
         raise ValueError("Invalid token format.")
     header_b64, payload_b64, signature_b64 = parts
     signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
-    expected_signature = hmac.new(settings.admin_token_secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    expected_signature = hmac.new(secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
     actual_signature = _b64url_decode(signature_b64)
     if not hmac.compare_digest(expected_signature, actual_signature):
         raise ValueError("Invalid token signature.")
@@ -49,6 +57,14 @@ def verify_access_token(token: str) -> dict:
     if exp <= int(time.time()):
         raise ValueError("Token is expired.")
     return payload
+
+
+def verify_access_token(token: str) -> dict:
+    return _verify_jwt(token, settings.admin_token_secret)
+
+
+def verify_customer_token(token: str) -> dict:
+    return _verify_jwt(token, settings.customer_token_secret)
 
 
 def create_password_hash(password: str) -> tuple[str, str]:

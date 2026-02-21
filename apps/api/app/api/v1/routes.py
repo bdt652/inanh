@@ -6,6 +6,10 @@ from pymongo.errors import DuplicateKeyError
 
 from app.api.v1.auth import require_admin
 from app.api.v1.content_admin import router as content_admin_router
+from app.api.v1.orders import router as orders_router
+from app.api.v1.drafts import router as drafts_router
+from app.api.v1.uploads import router as uploads_router
+from app.api.v1.users import router as users_router
 from app.api.v1.schemas import (
     AdminBootstrapRequest,
     AdminLoginRequest,
@@ -28,6 +32,10 @@ from app.db.mongo import ensure_indexes, get_db, ping_database
 
 router = APIRouter()
 router.include_router(content_admin_router)
+router.include_router(users_router)
+router.include_router(drafts_router)
+router.include_router(orders_router)
+router.include_router(uploads_router)
 
 
 def _normalize_page_path(raw_path: str) -> str:
@@ -41,12 +49,30 @@ def _normalize_page_path(raw_path: str) -> str:
     return normalized
 
 
+def _resolve_allow_online_order(doc: dict) -> bool:
+    raw_value = doc.get("allow_online_order")
+    if raw_value is None:
+        return True
+    return bool(raw_value)
+
+
+def _resolve_optional_int(doc: dict, key: str) -> int | None:
+    raw_value = doc.get(key)
+    if raw_value is None:
+        return None
+    return int(raw_value)
+
+
 def _serialize_product(doc: dict) -> Product:
     return Product(
         id=str(doc.get("_id")) if doc.get("_id") else None,
         name=str(doc.get("name", "")),
         price=float(doc.get("price", 0)),
         slug=str(doc.get("slug", "")),
+        extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
+        allow_online_order=_resolve_allow_online_order(doc),
+        min_images=_resolve_optional_int(doc, "min_images"),
+        max_images=_resolve_optional_int(doc, "max_images"),
     )
 
 
@@ -74,6 +100,10 @@ def _serialize_product_detail(doc: dict) -> ProductDetail:
         image_url=image_urls[0] if image_urls else "",
         image_urls=image_urls,
         short_description=str(doc.get("short_description", "")),
+        extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
+        allow_online_order=_resolve_allow_online_order(doc),
+        min_images=_resolve_optional_int(doc, "min_images"),
+        max_images=_resolve_optional_int(doc, "max_images"),
     )
 
 
@@ -88,6 +118,9 @@ def _serialize_product_view(doc: dict) -> ProductView:
         image_url=str(doc.get("image_url", "")),
         highlight=str(doc["highlight"]) if doc.get("highlight") is not None else None,
         tags=[str(tag) for tag in doc.get("tags", [])],
+        allow_online_order=_resolve_allow_online_order(doc),
+        min_images=_resolve_optional_int(doc, "min_images"),
+        max_images=_resolve_optional_int(doc, "max_images"),
     )
 
 
@@ -120,6 +153,10 @@ def _serialize_product_record_as_view(doc: dict) -> ProductView:
         image_url=image_url,
         highlight="Sale" if has_sale else None,
         tags=[category_slug.replace("-", " ")] if category_slug else [],
+        extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
+        allow_online_order=_resolve_allow_online_order(doc),
+        min_images=_resolve_optional_int(doc, "min_images"),
+        max_images=_resolve_optional_int(doc, "max_images"),
     )
 
 
@@ -132,6 +169,12 @@ def _serialize_site_setting(doc: dict) -> SiteSetting:
         address=str(doc.get("address", "")),
         hotline_zalo=str(doc.get("hotline_zalo", "")),
         email=str(doc.get("email", "")),
+        upload_min_files=int(doc.get("upload_min_files")) if doc.get("upload_min_files") is not None else None,
+        upload_max_files=int(doc.get("upload_max_files")) if doc.get("upload_max_files") is not None else None,
+        upload_max_bytes=int(doc.get("upload_max_bytes")) if doc.get("upload_max_bytes") is not None else None,
+        upload_require_verified_phone_threshold=int(doc.get("upload_require_verified_phone_threshold"))
+        if doc.get("upload_require_verified_phone_threshold") is not None
+        else None,
     )
 
 

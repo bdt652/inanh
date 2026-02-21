@@ -10,11 +10,9 @@ import type {
 } from "./content";
 import { normalizePath, stripHtmlSuffix } from "./paths";
 
-const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/, "");
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL ??
-  (backendBase ? `${backendBase}/api/v1` : "http://localhost:8000/api/v1")
-).replace(/\/+$/, "");
+import { resolveApiBase } from "./api-base";
+
+const API_BASE = resolveApiBase();
 
 async function fetchFromApi<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -101,7 +99,7 @@ export async function getAllProducts(limit = 200): Promise<ProductCard[]> {
 }
 
 export async function getProductDetail(slug: string): Promise<ProductDetail | null> {
-  const normalizedSlug = slug.trim();
+  const normalizedSlug = slug.trim().replace(/\.html$/i, "");
   if (!normalizedSlug) {
     return null;
   }
