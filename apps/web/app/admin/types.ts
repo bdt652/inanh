@@ -8,6 +8,83 @@ export type AdminProfile = {
   username: string;
 };
 
+export type AdminOrderSummary = {
+  order_id: string;
+  status: string;
+  total_products: number;
+  total_images: number;
+  updated_at: number;
+  user_id: string;
+};
+
+export type AdminOrderProduct = {
+  id: string;
+  name: string;
+  quantity: number;
+  copies_per_image?: number;
+  image_copies?: { key: string; copies: number }[];
+  notes?: string | null;
+  images: string[];
+  options: string[];
+  selected_product_slug?: string | null;
+};
+
+export type AdminOrderDetail = AdminOrderSummary & {
+  created_at: number;
+  note?: string | null;
+  shipping_name?: string | null;
+  shipping_phone?: string | null;
+  shipping_address?: string | null;
+  products: AdminOrderProduct[];
+};
+
+export type AdminDraftSummary = {
+  user_id: string;
+  saved_at: number;
+  total_products: number;
+  total_images: number;
+};
+
+export type AdminDraftProductPreview = {
+  id: string;
+  name: string;
+  key: string;
+  size?: number | null;
+  status?: "ready" | "duplicate" | string;
+  copies?: number;
+};
+
+export type AdminDraftProduct = {
+  name: string;
+  notes?: string | null;
+  price_per_image: number;
+  copies_per_image?: number;
+  selected_product_slug?: string | null;
+  selected_options: string[];
+  previews: AdminDraftProductPreview[];
+};
+
+export type AdminDraftDetail = {
+  user_id: string;
+  note?: string | null;
+  saved_at: number;
+  products: AdminDraftProduct[];
+};
+
+export type AdminUserRecord = {
+  phone: string;
+  email?: string | null;
+  phone_verified: boolean;
+  is_active: boolean;
+  created_at: number;
+};
+
+export type AdminUserUpdate = {
+  email?: string | null;
+  phone_verified?: boolean;
+  is_active?: boolean;
+};
+
 export type MenuRecord = {
   id: string;
   label: string;
@@ -40,11 +117,13 @@ export type ProductRecord = {
   image_url: string;
   image_urls: string[];
   short_description: string;
+  content: string;
   order: number;
   is_active: boolean;
   is_featured: boolean;
   extra_options: string[];
   allow_online_order: boolean;
+  pricing_mode?: "combo" | "retail";
   min_images?: number | null;
   max_images?: number | null;
 };
@@ -111,11 +190,13 @@ export type ProductUpsert = {
   image_url: string;
   image_urls: string[];
   short_description: string;
+  content: string;
   order: number;
   is_active: boolean;
   is_featured: boolean;
   extra_options: string[];
   allow_online_order: boolean;
+  pricing_mode: "combo" | "retail";
   min_images?: number | null;
   max_images?: number | null;
 };

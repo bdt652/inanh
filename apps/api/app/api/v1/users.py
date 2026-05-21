@@ -5,6 +5,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 import httpx
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -16,6 +17,7 @@ from app.api.v1.schemas import (
     RequestOtpResponse,
     UserLoginRequest,
     UserProfile,
+    UserProfileUpdateRequest,
     UserRegisterRequest,
     UserTokenResponse,
 )
@@ -63,6 +65,8 @@ async def _send_otp_sms(phone: str, code: str) -> None:
 async def register_user(payload: UserRegisterRequest, db: AsyncIOMotorDatabase = Depends(get_db)) -> UserTokenResponse:
     phone = payload.phone.strip()
     email = payload.email.strip() if payload.email else None
+    full_name = payload.full_name.strip() if payload.full_name else None
+    address = payload.address.strip() if payload.address else None
 
     existing_user = await db["users"].find_one({"phone": phone})
     if existing_user:
@@ -72,6 +76,8 @@ async def register_user(payload: UserRegisterRequest, db: AsyncIOMotorDatabase =
         "_id": phone,
         "phone": phone,
         "email": email,
+        "full_name": full_name,
+        "address": address,
         "password_salt": salt,
         "password_hash": password_hash,
         "phone_verified": False,
@@ -194,6 +200,8 @@ async def verify_phone(
     return UserProfile(
         phone=user["phone"],
         email=user.get("email"),
+        full_name=user.get("full_name"),
+        address=user.get("address"),
         phone_verified=bool(user.get("phone_verified")),
     )
 
@@ -229,5 +237,41 @@ async def get_me(current_user: dict = Depends(require_user), db: AsyncIOMotorDat
     return UserProfile(
         phone=user.get("phone") or current_user["id"],
         email=user.get("email"),
+        full_name=user.get("full_name"),
+        address=user.get("address"),
         phone_verified=bool(user.get("phone_verified")),
     )
+
+@router.patch("/me", response_model=UserProfile)
+async def update_me(
+    payload: UserProfileUpdateRequest,
+    current_user: dict = Depends(require_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> UserProfile:
+    update_data: dict = {}
+    if payload.email is not None:
+        value = payload.email.strip()
+        update_data["email"] = value or None
+    if payload.full_name is not None:
+        value = payload.full_name.strip()
+        update_data["full_name"] = value or None
+    if payload.address is not None:
+        value = payload.address.strip()
+        update_data["address"] = value or None
+    if not update_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nothing to update.")
+    doc = await db["users"].find_one_and_update(
+        {"_id": current_user["id"]},
+        {"$set": update_data},
+        return_document=ReturnDocument.AFTER,
+    )
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy tài khoản.")
+    return UserProfile(
+        phone=doc.get("phone") or current_user["id"],
+        email=doc.get("email"),
+        full_name=doc.get("full_name"),
+        address=doc.get("address"),
+        phone_verified=bool(doc.get("phone_verified")),
+    )
+

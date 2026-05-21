@@ -21,12 +21,22 @@ type UploadSessionResponse = {
 export type UserProfile = {
   phone: string;
   email?: string | null;
+  full_name?: string | null;
+  address?: string | null;
   phone_verified: boolean;
+};
+
+export type UserProfileUpdate = {
+  email?: string | null;
+  full_name?: string | null;
+  address?: string | null;
 };
 
 export type OrderProductPayload = {
   name: string;
   quantity: number;
+  copies_per_image?: number;
+  image_copies?: { key: string; copies: number }[];
   notes?: string;
   images?: string[];
   options?: string[];
@@ -44,6 +54,9 @@ export type OrderSummary = {
 export type OrderDetail = OrderSummary & {
   created_at: number;
   note?: string | null;
+  shipping_name?: string | null;
+  shipping_phone?: string | null;
+  shipping_address?: string | null;
   products: (OrderProductPayload & { id: string; images: string[] })[];
 };
 
@@ -104,11 +117,17 @@ async function requestWithAuth<T>(path: string, token: string, options: RequestI
   return request<T>(path, { ...options, headers });
 }
 
-export async function registerUser(phone: string, password: string, email?: string): Promise<TokenResponse> {
+export async function registerUser(
+  phone: string,
+  password: string,
+  email?: string,
+  full_name?: string,
+  address?: string
+): Promise<TokenResponse> {
   return request<TokenResponse>("/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, password, email }),
+    body: JSON.stringify({ phone, password, email, full_name, address }),
   });
 }
 
@@ -132,12 +151,18 @@ export type OrderCreatePayload = {
   products: OrderProductPayload[];
   status?: string;
   note?: string;
+  shipping_name?: string;
+  shipping_phone?: string;
+  shipping_address?: string;
 };
 
 export type OrderUpdatePayload = {
   products?: OrderProductPayload[];
   status?: string;
   note?: string;
+  shipping_name?: string;
+  shipping_phone?: string;
+  shipping_address?: string;
 };
 
 export async function requestOtp(token: string): Promise<{ sent: boolean; debug_otp?: string | null }> {
@@ -148,6 +173,14 @@ export async function requestOtp(token: string): Promise<{ sent: boolean; debug_
 
 export async function getProfile(token: string): Promise<UserProfile> {
   return requestWithAuth<UserProfile>("/auth/me", token, { method: "GET" });
+}
+
+export async function updateProfile(token: string, payload: UserProfileUpdate): Promise<UserProfile> {
+  return requestWithAuth<UserProfile>("/auth/me", token, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getMyOrders(token: string): Promise<OrderSummary[]> {
@@ -239,12 +272,14 @@ export type CartDraftProductPreview = {
   key: string;
   size?: number;
   status?: string;
+  copies?: number;
 };
 
 export type CartDraftProductPayload = {
   name: string;
   notes?: string;
   price_per_image: number;
+  copies_per_image?: number;
   selected_product_slug?: string;
   selected_options: string[];
   previews: CartDraftProductPreview[];

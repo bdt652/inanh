@@ -33,7 +33,7 @@ export default function AdminHeroPage() {
     if (!token) return;
     listHero(token)
       .then((data) => setItems(sortByOrder(data)))
-      .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc hero."))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được hero."))
       .finally(() => setLoaded(true));
   }, [token]);
 
@@ -68,21 +68,21 @@ export default function AdminHeroPage() {
     try {
       const payload: HeroUpsert = { ...form, order: Math.max(0, form.order) };
       if (!payload.title.trim() || !payload.description.trim()) {
-        setError("Title va description la bat buoc.");
+        setError("Title và description là bắt buộc.");
         return;
       }
       if (editId) {
         const updated = await updateHero(token, editId, payload);
         setItems((prev) => sortByOrder(prev.map((item) => (item.id === updated.id ? updated : item))));
-        setNotice("Da cap nhat hero.");
+        setNotice("Đã cập nhật hero.");
       } else {
         const created = await createHero(token, payload);
         setItems((prev) => sortByOrder([...prev, created]));
-        setNotice("Da tao hero.");
+        setNotice("Đã tạo hero.");
       }
       resetModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc hero.");
+      setError(err instanceof Error ? err.message : "Không lưu được hero.");
     } finally {
       setSaving(false);
     }
@@ -100,10 +100,10 @@ export default function AdminHeroPage() {
     try {
       await deleteHero(token, pendingDeleteId);
       setItems((prev) => prev.filter((item) => item.id !== pendingDeleteId));
-      setNotice("Da xoa hero.");
+      setNotice("Đã xóa hero.");
       setPendingDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong xoa duoc hero.");
+      setError(err instanceof Error ? err.message : "Không xóa được hero.");
     } finally {
       setDeleting(false);
     }
@@ -114,11 +114,11 @@ export default function AdminHeroPage() {
   return (
     <AdminShell
       title="Hero"
-      subtitle="Tat ca thao tac them/sua duoc thuc hien qua popup."
+      subtitle="Tất cả thao tác thêm/sửa được thực hiện qua popup."
       onLogout={logout}
       actions={
         <button type="button" onClick={openCreate} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-          Them hero
+          Thêm hero
         </button>
       }
     >
@@ -126,7 +126,7 @@ export default function AdminHeroPage() {
       {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</p>}
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} hero items` : "Dang tai..."}</p>
+        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} mục hero` : "Đang tải..."}</p>
         <div className="grid gap-3">
           {items.map((item) => (
             <article key={item.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
@@ -139,32 +139,32 @@ export default function AdminHeroPage() {
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => openEdit(item)} className="rounded-lg border border-stone-300 px-3 py-1 text-xs">
-                    Sua
+                    Sửa
                   </button>
                   <button
                     type="button"
                     onClick={() => requestDelete(item.id)}
                     className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600"
                   >
-                    Xoa
+                    Xóa
                   </button>
                 </div>
               </div>
             </article>
           ))}
-          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chua co hero nao.</p>}
+          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chưa có hero nào.</p>}
         </div>
       </section>
 
       <AdminModal
         open={modalOpen}
         onClose={resetModal}
-        title={editId ? "Sua hero" : "Them hero"}
-        description="Dien ro title, description va thu tu hien thi."
+        title={editId ? "Sửa hero" : "Thêm hero"}
+        description="Điền rõ tiêu đề, mô tả và thứ tự hiển thị."
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" onClick={resetModal} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
@@ -172,14 +172,14 @@ export default function AdminHeroPage() {
               disabled={saving}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              {saving ? "Dang luu..." : "Luu"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         }
       >
         <form id="hero-form" className="space-y-3" onSubmit={handleSave}>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Tieu de
+            Tiêu đề
             <input
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.title}
@@ -188,7 +188,7 @@ export default function AdminHeroPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Mo ta
+            Mô tả
             <textarea
               className="min-h-24 rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.description}
@@ -197,7 +197,7 @@ export default function AdminHeroPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Thu tu hien thi
+            Thứ tự hiển thị
             <input
               type="number"
               min={0}
@@ -212,9 +212,9 @@ export default function AdminHeroPage() {
       <ConfirmActionModal
         open={Boolean(pendingDeleteId)}
         busy={deleting}
-        title="Xac nhan xoa hero"
-        description="Ban co chac chan muon xoa muc hero nay khong?"
-        confirmLabel="Xoa hero"
+        title="Xác nhận xóa hero"
+        description="Bạn có chắc chắn muốn xóa mục hero này không?"
+        confirmLabel="Xóa hero"
         onConfirm={() => void handleDelete()}
         onClose={() => setPendingDeleteId(null)}
       />

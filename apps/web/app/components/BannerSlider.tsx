@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { Banner } from "../lib/content";
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 
 type BannerSliderProps = {
   slides: Banner[];
@@ -47,6 +49,10 @@ export default function BannerSlider({ slides }: BannerSliderProps) {
   }
 
   const activeIndex = index % slides.length;
+  const normalizedSlides = slides.map((slide) => ({
+    ...slide,
+    img: normalizeImageUrl(slide.img),
+  }));
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (slides.length <= 1) return;
@@ -88,7 +94,7 @@ export default function BannerSlider({ slides }: BannerSliderProps) {
         onPointerUp={finishDrag}
         onPointerCancel={finishDrag}
       >
-        {slides.map((slide, slideIndex) => (
+        {normalizedSlides.map((slide, slideIndex) => (
           <div
             key={`${slide.img}-${slideIndex}`}
             className={`absolute inset-0 transition-[opacity,transform] duration-500 ${
@@ -101,12 +107,16 @@ export default function BannerSlider({ slides }: BannerSliderProps) {
                   : "translateX(0)",
             }}
           >
-            <img
+            <Image
               src={slide.img}
               alt={slide.alt}
-              className="h-full w-full object-cover"
-              loading={slideIndex === 0 ? "eager" : "lazy"}
+              fill
+              sizes="(min-width: 1280px) 1200px, 100vw"
+              className="object-cover"
+              priority={slideIndex === 0}
               fetchPriority={slideIndex === 0 ? "high" : "auto"}
+              loading={slideIndex === 0 ? "eager" : "lazy"}
+              unoptimized={shouldSkipImageOptimization(slide.img)}
               draggable={false}
             />
           </div>

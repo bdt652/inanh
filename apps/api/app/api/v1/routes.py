@@ -1,11 +1,13 @@
-﻿import re
+﻿import hmac
+import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo.errors import DuplicateKeyError
 
 from app.api.v1.auth import require_admin
 from app.api.v1.content_admin import router as content_admin_router
+from app.api.v1.admin_manage import router as admin_manage_router
 from app.api.v1.orders import router as orders_router
 from app.api.v1.drafts import router as drafts_router
 from app.api.v1.uploads import router as uploads_router
@@ -27,11 +29,13 @@ from app.api.v1.schemas import (
     ProductView,
     SiteSetting,
 )
+from app.core.config import settings
 from app.core.security import create_access_token, create_password_hash, verify_password
 from app.db.mongo import ensure_indexes, get_db, ping_database
 
 router = APIRouter()
 router.include_router(content_admin_router)
+router.include_router(admin_manage_router)
 router.include_router(users_router)
 router.include_router(drafts_router)
 router.include_router(orders_router)
@@ -49,11 +53,30 @@ def _normalize_page_path(raw_path: str) -> str:
     return normalized
 
 
+def _require_bootstrap_secret(request: Request) -> None:
+    secret = (settings.admin_bootstrap_secret or "").strip()
+    if not secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin bootstrap is disabled.",
+        )
+    provided = request.headers.get("x-admin-bootstrap-secret", "")
+    if not hmac.compare_digest(provided, secret):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bootstrap secret.")
+
+
 def _resolve_allow_online_order(doc: dict) -> bool:
     raw_value = doc.get("allow_online_order")
     if raw_value is None:
         return True
     return bool(raw_value)
+
+
+def _resolve_pricing_mode(doc: dict) -> str:
+    raw_value = str(doc.get("pricing_mode", "")).strip().lower()
+    if raw_value == "combo":
+        return "combo"
+    return "retail"
 
 
 def _resolve_optional_int(doc: dict, key: str) -> int | None:
@@ -71,6 +94,7 @@ def _serialize_product(doc: dict) -> Product:
         slug=str(doc.get("slug", "")),
         extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
         allow_online_order=_resolve_allow_online_order(doc),
+        pricing_mode=_resolve_pricing_mode(doc),
         min_images=_resolve_optional_int(doc, "min_images"),
         max_images=_resolve_optional_int(doc, "max_images"),
     )
@@ -100,8 +124,10 @@ def _serialize_product_detail(doc: dict) -> ProductDetail:
         image_url=image_urls[0] if image_urls else "",
         image_urls=image_urls,
         short_description=str(doc.get("short_description", "")),
+        content=str(doc.get("content", "")),
         extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
         allow_online_order=_resolve_allow_online_order(doc),
+        pricing_mode=_resolve_pricing_mode(doc),
         min_images=_resolve_optional_int(doc, "min_images"),
         max_images=_resolve_optional_int(doc, "max_images"),
     )
@@ -119,6 +145,7 @@ def _serialize_product_view(doc: dict) -> ProductView:
         highlight=str(doc["highlight"]) if doc.get("highlight") is not None else None,
         tags=[str(tag) for tag in doc.get("tags", [])],
         allow_online_order=_resolve_allow_online_order(doc),
+        pricing_mode=_resolve_pricing_mode(doc),
         min_images=_resolve_optional_int(doc, "min_images"),
         max_images=_resolve_optional_int(doc, "max_images"),
     )
@@ -155,6 +182,7 @@ def _serialize_product_record_as_view(doc: dict) -> ProductView:
         tags=[category_slug.replace("-", " ")] if category_slug else [],
         extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
         allow_online_order=_resolve_allow_online_order(doc),
+        pricing_mode=_resolve_pricing_mode(doc),
         min_images=_resolve_optional_int(doc, "min_images"),
         max_images=_resolve_optional_int(doc, "max_images"),
     )
@@ -216,7 +244,12 @@ async def admin_me(current_admin: str = Depends(require_admin)) -> AdminProfile:
 
 
 @router.post("/admin/bootstrap", response_model=AdminProfile, tags=["admin"], summary="Bootstrap first admin")
-async def admin_bootstrap(payload: AdminBootstrapRequest, db: AsyncIOMotorDatabase = Depends(get_db)) -> AdminProfile:
+async def admin_bootstrap(
+    payload: AdminBootstrapRequest,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> AdminProfile:
+    _require_bootstrap_secret(request)
     existing = await db["admins"].find_one({})
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Admin account already exists.")

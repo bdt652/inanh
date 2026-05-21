@@ -1,10 +1,18 @@
 "use client";
 
+import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import type { ChangeEvent, FormEvent, Dispatch, SetStateAction } from "react";
 
 import AdminModal from "../AdminModal";
+import { shouldSkipImageOptimization } from "../../lib/image";
 import type { CategoryRecord, ProductUpsert } from "../types";
+
+const PageContentEditor = dynamic(() => import("../PageContentEditor"), {
+  ssr: false,
+  loading: () => <p className="text-xs text-stone-500">Đang tải trình soạn thảo...</p>,
+});
 
 type ProductFormModalProps = {
   open: boolean;
@@ -16,6 +24,7 @@ type ProductFormModalProps = {
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onUploadImages: (event: ChangeEvent<HTMLInputElement>) => void;
+  onUploadContentImage?: (file: File) => Promise<string>;
   onReorderImage: (fromIndex: number, toIndex: number) => void;
   onAutoSlug: () => void;
   onFormChange: Dispatch<SetStateAction<ProductUpsert>>;
@@ -31,6 +40,7 @@ export default function ProductFormModal({
   onClose,
   onSubmit,
   onUploadImages,
+  onUploadContentImage,
   onReorderImage,
   onAutoSlug,
   onFormChange,
@@ -64,13 +74,13 @@ export default function ProductFormModal({
     <AdminModal
       open={open}
       onClose={onClose}
-      title={editing ? "Sua san pham" : "Them san pham"}
-      description="Tat ca field co label, upload hinh co preview ro rang."
+      title={editing ? "Sửa sản phẩm" : "Thêm sản phẩm"}
+      description="Tất cả field có label, upload hình có preview rõ ràng."
       maxWidthClassName="max-w-4xl"
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-            Huy
+            Hủy
           </button>
           <button
             type="submit"
@@ -78,14 +88,14 @@ export default function ProductFormModal({
             disabled={saving}
             className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white"
           >
-            {saving ? "Dang luu..." : "Luu"}
+            {saving ? "Đang lưu..." : "Lưu"}
           </button>
         </div>
       }
     >
       <form id="product-form" className="space-y-3" onSubmit={onSubmit}>
         <label className="grid gap-1 text-sm font-semibold text-stone-700">
-          Ten san pham
+          Tên sản phẩm
           <input
             className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
             value={form.name}
@@ -115,7 +125,7 @@ export default function ProductFormModal({
                 required
               />
               <button type="button" onClick={onAutoSlug} className="rounded-xl border border-stone-300 px-3 py-2 text-xs">
-                Tao slug
+                Tạo slug
               </button>
             </div>
           </label>
@@ -132,7 +142,7 @@ export default function ProductFormModal({
               }
               required
             >
-              <option value="">Chon danh muc</option>
+              <option value="">Chọn danh mục</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.slug}>
                   {category.label} ({category.slug})
@@ -144,7 +154,7 @@ export default function ProductFormModal({
 
         <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Gia
+            Giá
             <input
               type="number"
               min={0}
@@ -160,7 +170,7 @@ export default function ProductFormModal({
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Gia sale (optional)
+            Giá sale (tùy chọn)
             <input
               type="number"
               min={0}
@@ -176,9 +186,26 @@ export default function ProductFormModal({
           </label>
         </div>
 
+        <label className="grid gap-1 text-sm font-semibold text-stone-700">
+          Hình thức tính giá
+          <select
+            className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+            value={form.pricing_mode}
+            onChange={(event) =>
+              onFormChange((prev) => ({
+                ...prev,
+                pricing_mode: event.target.value === "combo" ? "combo" : "retail",
+              }))
+            }
+          >
+            <option value="retail">Bán lẻ (theo ảnh)</option>
+            <option value="combo">Combo (giá cố định)</option>
+          </select>
+        </label>
+
         <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Toi thieu so anh / don
+            Tối thiểu số ảnh / đơn
             <input
               type="number"
               min={1}
@@ -196,7 +223,7 @@ export default function ProductFormModal({
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Toi da so anh / don
+            Tối đa số ảnh / đơn
             <input
               type="number"
               min={1}
@@ -216,7 +243,7 @@ export default function ProductFormModal({
         </div>
 
         <label className="grid gap-1 text-sm font-semibold text-stone-700">
-          Mo ta ngan
+          Mô tả ngắn
           <textarea
             className="min-h-20 rounded-xl border border-stone-300 px-3 py-2 text-sm"
             value={form.short_description}
@@ -228,6 +255,21 @@ export default function ProductFormModal({
             }
           />
         </label>
+
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-stone-700">Nội dung sản phẩm</p>
+          <PageContentEditor
+            value={form.content}
+            onChange={(next) =>
+              onFormChange((prev) => ({
+                ...prev,
+                content: next,
+              }))
+            }
+            onUploadImage={onUploadContentImage}
+            placeholder="Nhập nội dung chi tiết cho sản phẩm..."
+          />
+        </div>
 
         <div className="space-y-2">
           <p className="text-sm font-semibold text-stone-700">Tùy chọn in ấn</p>
@@ -276,26 +318,34 @@ export default function ProductFormModal({
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-stone-700">Hinh san pham</p>
+          <p className="text-sm font-semibold text-stone-700">Hình sản phẩm</p>
+          <p className="text-xs text-stone-500">Kích thước khuyến nghị: 1200x900 (tỷ lệ 4:3).</p>
           <input id="product-images-file" type="file" accept="image/*" multiple className="sr-only" onChange={onUploadImages} />
           <label
             htmlFor="product-images-file"
             className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-5 text-center transition hover:border-emerald-400 hover:bg-emerald-50"
           >
             <span className="rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white">
-              Bam vao day de chon hinh san pham
+              Bấm vào đây để chọn hình sản phẩm
             </span>
-            <span className="text-xs text-stone-500">Co the chon nhieu hinh trong mot lan upload.</span>
+            <span className="text-xs text-stone-500">Có thể chọn nhiều hình trong một lần upload.</span>
           </label>
         </div>
 
         <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Image preview</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Xem trước ảnh</p>
           {previewImages.length > 0 ? (
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {previewImages.map((url, index) => (
-                <div key={url} className="relative overflow-hidden rounded-lg border border-stone-200 bg-white">
-                  <img src={url} alt="product preview" className="h-24 w-full object-cover" />
+                <div key={url} className="relative h-24 overflow-hidden rounded-lg border border-stone-200 bg-white">
+                  <Image
+                    src={url}
+                    alt="product preview"
+                    fill
+                    sizes="100vw"
+                    className="object-cover"
+                    unoptimized={shouldSkipImageOptimization(url)}
+                  />
                   <div className="absolute left-1 top-1 flex flex-col gap-1">
                     <button
                       type="button"
@@ -322,14 +372,14 @@ export default function ProductFormModal({
             </div>
           ) : (
             <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-stone-300 text-xs text-stone-500">
-              Chua co hinh nao
+              Chưa có hình nào
             </div>
           )}
         </div>
 
         <div className="grid gap-3 md:grid-cols-4">
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Thu tu hien thi
+            Thứ tự hiển thị
             <input
               type="number"
               min={0}
@@ -354,7 +404,7 @@ export default function ProductFormModal({
                 }))
               }
             />
-            Dang hien thi
+            Đang hiển thị
           </label>
           <label className="flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700">
             <input
@@ -367,7 +417,7 @@ export default function ProductFormModal({
                 }))
               }
             />
-            Noi bat trang chu
+            Nổi bật trang chủ
           </label>
           <label className="flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700">
             <input
@@ -380,7 +430,7 @@ export default function ProductFormModal({
                 }))
               }
             />
-            Cho phep dat hang online
+            Cho phép đặt hàng online
           </label>
         </div>
       </form>

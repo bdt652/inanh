@@ -1,6 +1,8 @@
-﻿import Link from "next/link";
+﻿import Image from "next/image";
+import Link from "next/link";
 
 import type { Category } from "../lib/content";
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 import { toHtmlPath } from "../lib/paths";
 
 type CategoryGridProps = {
@@ -28,11 +30,13 @@ export default function CategoryGrid({ categories }: CategoryGridProps) {
             style={{ animationDelay: `${Math.min(idx * 90, 420)}ms` }}
           >
             {item.img ? (
-              <img
-                src={item.img}
+              <Image
+                src={normalizeImageUrl(item.img)}
                 alt={item.label}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                loading="lazy"
+                fill
+                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                className="object-cover transition-transform duration-700 group-hover:scale-110"
+                unoptimized={shouldSkipImageOptimization(item.img)}
               />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-[#f8dfbf] to-[#ddb58b]" />

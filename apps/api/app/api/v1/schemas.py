@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -15,6 +17,8 @@ class UserRegisterRequest(BaseModel):
     phone: str = Field(min_length=8, max_length=20)
     password: str = Field(min_length=8, max_length=200)
     email: str | None = Field(default=None, max_length=200)
+    full_name: str | None = Field(default=None, max_length=200)
+    address: str | None = Field(default=None, max_length=500)
 
 
 class UserLoginRequest(BaseModel):
@@ -46,13 +50,28 @@ class PhoneOtpRequest(BaseModel):
 class UserProfile(BaseModel):
     phone: str
     email: str | None = None
+    full_name: str | None = None
+    address: str | None = None
     phone_verified: bool = False
+
+
+class UserProfileUpdateRequest(BaseModel):
+    email: str | None = Field(default=None, max_length=200)
+    full_name: str | None = Field(default=None, max_length=200)
+    address: str | None = Field(default=None, max_length=500)
+
+class ImageCopy(BaseModel):
+    key: str = Field(min_length=1, max_length=500)
+    copies: int = Field(default=1, ge=1, le=10_000)
+
 
 class OrderProductPayload(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     quantity: int = Field(gt=0, le=10_000)
+    copies_per_image: int = Field(default=1, ge=1, le=10_000)
     notes: str | None = Field(default=None, max_length=1000)
     images: list[str] = Field(default_factory=list, max_length=30)
+    image_copies: list[ImageCopy] = Field(default_factory=list, max_length=200)
     options: list[str] = Field(default_factory=list, max_length=20)
     selected_product_slug: str | None = Field(default=None, max_length=200)
 
@@ -99,12 +118,18 @@ class OrderCreateRequest(BaseModel):
     products: list[OrderProductPayload] = Field(min_length=1, max_length=50)
     status: str | None = Field(default=None, max_length=100)
     note: str | None = Field(default=None, max_length=2000)
+    shipping_name: str | None = Field(default=None, max_length=200)
+    shipping_phone: str | None = Field(default=None, max_length=30)
+    shipping_address: str | None = Field(default=None, max_length=500)
 
 
 class OrderUpdateRequest(BaseModel):
     products: list[OrderProductPayload] | None = Field(default=None, max_length=50)
     status: str | None = Field(default=None, max_length=100)
     note: str | None = Field(default=None, max_length=2000)
+    shipping_name: str | None = Field(default=None, max_length=200)
+    shipping_phone: str | None = Field(default=None, max_length=30)
+    shipping_address: str | None = Field(default=None, max_length=500)
 
 
 class OrderSummary(BaseModel):
@@ -118,7 +143,18 @@ class OrderSummary(BaseModel):
 class OrderDetail(OrderSummary):
     products: list[OrderProduct]
     note: str | None = None
+    shipping_name: str | None = None
+    shipping_phone: str | None = None
+    shipping_address: str | None = None
     created_at: int
+
+
+class AdminOrderSummary(OrderSummary):
+    user_id: str
+
+
+class AdminOrderDetail(OrderDetail):
+    user_id: str
 
 class CartDraftProductPreview(BaseModel):
     id: str
@@ -126,12 +162,14 @@ class CartDraftProductPreview(BaseModel):
     key: str
     size: int | None = None
     status: str = "ready"
+    copies: int = Field(default=1, ge=1, le=10_000)
 
 
 class CartDraftProduct(BaseModel):
     name: str
     notes: str | None = None
     price_per_image: int = Field(ge=0)
+    copies_per_image: int = Field(default=1, ge=1, le=10_000)
     selected_product_slug: str | None = None
     selected_options: list[str] = Field(default_factory=list)
     previews: list[CartDraftProductPreview] = Field(default_factory=list)
@@ -160,6 +198,31 @@ class CartDraftPayload(BaseModel):
 
 class CartDraftResponse(CartDraftPayload):
     saved_at: int
+
+
+class AdminDraftSummary(BaseModel):
+    user_id: str
+    saved_at: int
+    total_products: int
+    total_images: int
+
+
+class AdminDraftDetail(CartDraftResponse):
+    user_id: str
+
+
+class AdminUserRecord(BaseModel):
+    phone: str
+    email: str | None = None
+    phone_verified: bool = False
+    is_active: bool = True
+    created_at: int
+
+
+class AdminUserUpdateRequest(BaseModel):
+    email: str | None = None
+    phone_verified: bool | None = None
+    is_active: bool | None = None
 
 
 class MenuItem(BaseModel):
@@ -382,6 +445,7 @@ class ProductView(BaseModel):
     tags: list[str] = Field(default_factory=list)
     extra_options: list[str] = Field(default_factory=list)
     allow_online_order: bool = True
+    pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = None
     max_images: int | None = None
 
@@ -393,6 +457,7 @@ class Product(BaseModel):
     slug: str
     extra_options: list[str] = Field(default_factory=list)
     allow_online_order: bool = True
+    pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = None
     max_images: int | None = None
 
@@ -403,7 +468,9 @@ class ProductDetail(Product):
     image_url: str = ""
     image_urls: list[str] = Field(default_factory=list)
     short_description: str = ""
+    content: str = ""
     allow_online_order: bool = True
+    pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = None
     max_images: int | None = None
 
@@ -412,7 +479,9 @@ class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=180)
     price: float = Field(ge=0)
     slug: str = Field(min_length=1, max_length=180)
+    content: str = Field(default="", max_length=20000)
     allow_online_order: bool = True
+    pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = Field(default=None, ge=1, le=50_000)
     max_images: int | None = Field(default=None, ge=1, le=50_000)
 
@@ -433,11 +502,13 @@ class ProductUpsert(BaseModel):
     image_url: str = Field(default="", max_length=1000)
     image_urls: list[str] = Field(default_factory=list, max_length=30)
     short_description: str = Field(default="", max_length=1200)
+    content: str = Field(default="", max_length=20000)
     order: int = Field(default=0, ge=0)
     is_active: bool = True
     is_featured: bool = False
     extra_options: list[str] = Field(default_factory=list, max_length=20)
     allow_online_order: bool = True
+    pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = Field(default=None, ge=1, le=50_000)
     max_images: int | None = Field(default=None, ge=1, le=50_000)
 
@@ -477,10 +548,12 @@ class ProductRecord(BaseModel):
     image_url: str = ""
     image_urls: list[str] = Field(default_factory=list)
     short_description: str = ""
+    content: str = ""
     order: int = 0
     is_active: bool = True
     is_featured: bool = False
     extra_options: list[str] = Field(default_factory=list)
     allow_online_order: bool = True
+    pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = None
     max_images: int | None = None

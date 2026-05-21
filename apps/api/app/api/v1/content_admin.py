@@ -1,11 +1,13 @@
 import asyncio
-from pathlib import Path
+import io
+import tempfile
 from uuid import uuid4
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from PIL import Image, ImageOps
 from pymongo.errors import DuplicateKeyError
 
 from app.api.v1.auth import require_admin
@@ -27,7 +29,7 @@ from app.api.v1.schemas import (
     SiteSettingUpsert,
     UploadImageResponse,
 )
-from app.core.storage import StorageUnavailableError, store_object_bytes
+from app.core.storage import StorageUnavailableError, store_object_bytes, store_object_stream
 from app.core.uploads import UPLOADS_ROUTE_PREFIX, build_public_upload_url
 from app.db.mongo import ensure_indexes, get_db
 
@@ -39,7 +41,23 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
     "image/png",
     "image/webp",
 }
-MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_IMAGE_BYTES = 0
+DEFAULT_IMAGE_PURPOSE = "default"
+IMAGE_SIZE_PRESETS: dict[str, tuple[int, int]] = {
+    "banner": (1920, 730),
+    "category": (1200, 800),
+    "product": (1200, 900),
+    "product-thumbnail": (400, 400),
+    "logo": (400, 120),
+    "hero": (1920, 1080),
+    "page": (1600, 1600),
+    "menu": (200, 200),
+    "settings": (800, 600),
+    "content": (1600, 1600),
+    DEFAULT_IMAGE_PURPOSE: (1920, 1200),
+}
+WEBP_QUALITY = 82
+SPOOL_MAX_BYTES = 10 * 1024 * 1024
 _CONTENT_TYPE_EXTENSION_MAP = {
     "image/avif": ".avif",
     "image/gif": ".gif",
@@ -47,7 +65,6 @@ _CONTENT_TYPE_EXTENSION_MAP = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
-_ALLOWED_IMAGE_EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"}
 
 
 def _parse_object_id(raw_id: str) -> ObjectId:
@@ -145,6 +162,13 @@ def _resolve_allow_online_order(doc: dict) -> bool:
     return bool(raw_value)
 
 
+def _resolve_pricing_mode(doc: dict) -> str:
+    raw_value = str(doc.get("pricing_mode", "")).strip().lower()
+    if raw_value == "combo":
+        return "combo"
+    return "retail"
+
+
 def _resolve_optional_int(doc: dict, key: str) -> int | None:
     raw_value = doc.get(key)
     if raw_value is None:
@@ -176,11 +200,13 @@ def _serialize_product(doc: dict) -> ProductRecord:
         image_url=image_urls[0] if image_urls else "",
         image_urls=image_urls,
         short_description=str(doc.get("short_description", "")),
+        content=str(doc.get("content", "")),
         order=int(doc.get("order", 0)),
         is_active=bool(doc.get("is_active", True)),
         is_featured=bool(doc.get("is_featured", False)),
         extra_options=[str(option).strip() for option in doc.get("extra_options", []) if str(option).strip()],
         allow_online_order=_resolve_allow_online_order(doc),
+        pricing_mode=_resolve_pricing_mode(doc),
         min_images=_resolve_optional_int(doc, "min_images"),
         max_images=_resolve_optional_int(doc, "max_images"),
     )
@@ -192,11 +218,86 @@ async def _assert_category_slug_exists(category_slug: str, db: AsyncIOMotorDatab
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug not found.")
 
 
-def _resolve_image_extension(filename: str | None, content_type: str) -> str:
-    extension = Path(filename or "").suffix.lower()
-    if extension in _ALLOWED_IMAGE_EXTENSIONS:
-        return ".jpg" if extension == ".jpeg" else extension
-    return _CONTENT_TYPE_EXTENSION_MAP[content_type]
+def _resolve_image_purpose(raw: str | None) -> str:
+    normalized = (raw or "").strip().lower()
+    if normalized in IMAGE_SIZE_PRESETS:
+        return normalized
+    return DEFAULT_IMAGE_PURPOSE
+
+
+def _get_folder_for_purpose(purpose: str) -> str:
+    """Map image purpose to storage folder."""
+    folder_map = {
+        "banner": "banners",
+        "category": "categories",
+        "product": "products",
+        "product-thumbnail": "products/thumbnails",
+        "logo": "logos",
+        "hero": "hero",
+        "page": "pages",
+        "menu": "menu",
+        "settings": "settings",
+        "content": "content",  # Used for page content images and product detail images
+        DEFAULT_IMAGE_PURPOSE: "misc",
+    }
+    return folder_map.get(purpose, "misc")
+
+
+def _has_alpha(image: Image.Image) -> bool:
+    if image.mode in {"RGBA", "LA"}:
+        return True
+    return image.mode == "P" and "transparency" in image.info
+
+
+def _encode_image(image: Image.Image, has_alpha: bool, purpose: str) -> tuple[bytes, str, str]:
+    output = io.BytesIO()
+    if purpose == "logo" and has_alpha:
+        try:
+            image.save(output, format="WEBP", lossless=True, quality=100, method=6)
+            return output.getvalue(), "image/webp", ".webp"
+        except Exception:
+            output = io.BytesIO()
+            image.save(output, format="PNG", optimize=True)
+            return output.getvalue(), "image/png", ".png"
+
+    try:
+        image.save(output, format="WEBP", quality=WEBP_QUALITY, method=6)
+        return output.getvalue(), "image/webp", ".webp"
+    except Exception:
+        output = io.BytesIO()
+        if has_alpha:
+            image.save(output, format="PNG", optimize=True)
+            return output.getvalue(), "image/png", ".png"
+        image.save(output, format="JPEG", quality=WEBP_QUALITY, optimize=True, progressive=True)
+        return output.getvalue(), "image/jpeg", ".jpg"
+
+
+def _process_uploaded_image(source: io.BufferedIOBase, content_type: str, purpose: str) -> tuple[bytes | None, str, str, bool]:
+    try:
+        source.seek(0)
+        with Image.open(source) as image:
+            if getattr(image, "is_animated", False) and image.format == "GIF":
+                extension = _CONTENT_TYPE_EXTENSION_MAP.get(content_type, ".gif")
+                return None, content_type, extension, True
+
+            image = ImageOps.exif_transpose(image)
+            max_width, max_height = IMAGE_SIZE_PRESETS.get(purpose, IMAGE_SIZE_PRESETS[DEFAULT_IMAGE_PURPOSE])
+            if image.width > max_width or image.height > max_height:
+                image.thumbnail((max_width, max_height), Image.LANCZOS)
+
+            has_alpha = _has_alpha(image)
+            if has_alpha:
+                if image.mode not in {"RGBA", "LA"}:
+                    image = image.convert("RGBA")
+            elif image.mode != "RGB":
+                image = image.convert("RGB")
+
+            processed_bytes, processed_type, extension = _encode_image(image, has_alpha, purpose)
+            return processed_bytes, processed_type, extension, False
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image payload.") from exc
 
 
 @router.get("/content/banners", response_model=list[BannerRecord], summary="List banners from MongoDB")
@@ -262,41 +363,60 @@ async def upload_content_image(request: Request) -> UploadImageResponse:
     if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only image files are allowed.")
 
-    source_filename = request.headers.get("x-file-name")
-    extension = _resolve_image_extension(source_filename, content_type)
-    object_path = f"banners/{uuid4().hex}{extension}"
 
     total_size = 0
-    chunks: list[bytes] = []
+    spool = tempfile.SpooledTemporaryFile(max_size=SPOOL_MAX_BYTES)
     try:
         async for chunk in request.stream():
             if not chunk:
                 continue
             total_size += len(chunk)
-            if total_size > MAX_UPLOAD_IMAGE_BYTES:
+            if MAX_UPLOAD_IMAGE_BYTES > 0 and total_size > MAX_UPLOAD_IMAGE_BYTES:
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail="Image size exceeds 5MB.",
+                    detail=f"Image size exceeds {MAX_UPLOAD_IMAGE_BYTES // (1024 * 1024)}MB.",
                 )
-            chunks.append(chunk)
+            spool.write(chunk)
     except HTTPException:
+        spool.close()
         raise
     except Exception as exc:
+        spool.close()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save uploaded image.",
         ) from exc
 
     if total_size == 0:
+        spool.close()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image body.")
 
+    purpose = _resolve_image_purpose(request.headers.get("x-image-purpose"))
+    processed_bytes: bytes | None = None
+    processed_content_type = content_type
+    extension = ".jpg"
+    keep_original = False
     try:
-        await asyncio.to_thread(store_object_bytes, object_path, b"".join(chunks), content_type)
+        processed_bytes, processed_content_type, extension, keep_original = await asyncio.to_thread(
+            _process_uploaded_image, spool, content_type, purpose
+        )
+        folder = _get_folder_for_purpose(purpose)
+        filename = f"{uuid4().hex}{extension}"
+        object_path = f"{folder}/{filename}"
+        if keep_original:
+            spool.seek(0)
+            await asyncio.to_thread(store_object_stream, object_path, spool, total_size, processed_content_type)
+        else:
+            if processed_bytes is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image payload.")
+            await asyncio.to_thread(store_object_bytes, object_path, processed_bytes, processed_content_type)
     except StorageUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Image storage service is not available.",
         ) from exc
+    finally:
+        spool.close()
 
     public_path = f"{UPLOADS_ROUTE_PREFIX}/{object_path}"
     return UploadImageResponse(url=build_public_upload_url(request, public_path))

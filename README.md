@@ -58,6 +58,7 @@ Required environment variables:
 MONGODB_URI=mongodb://mongo:27017
 DB_NAME=inanh24h
 ADMIN_TOKEN_SECRET=change-this-secret
+ADMIN_BOOTSTRAP_SECRET=change-this-bootstrap-secret
 ADMIN_TOKEN_TTL_SECONDS=86400
 CUSTOMER_TOKEN_SECRET=change-this-customer-secret
 CUSTOMER_TOKEN_TTL_SECONDS=604800
@@ -92,7 +93,7 @@ NEXT_PUBLIC_SITE_URL=https://inanh24h.com
 ## API Endpoints
 - `GET /health` -> health check with MongoDB ping (returns `503` when DB unreachable)
 - `GET /api/v1/ping` -> ping check with MongoDB ping (returns `503` when DB unreachable)
-- `POST /api/v1/admin/bootstrap` -> create first admin account in MongoDB (only works when no admin exists)
+- `POST /api/v1/admin/bootstrap` -> create first admin account in MongoDB (only works when no admin exists, requires `X-Admin-Bootstrap-Secret`)
 - `POST /api/v1/admin/login` -> get admin bearer token
 - `GET /api/v1/admin/me` -> get current admin profile (requires bearer token)
 - `GET /api/v1/banners` (reads active banners from MongoDB `banners`, sorted by `order`)

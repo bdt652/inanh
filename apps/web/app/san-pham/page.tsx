@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 
 import AmbientGlow from "../components/AmbientGlow";
@@ -13,22 +13,31 @@ import { toHtmlPath } from "../lib/paths";
 export const dynamic = "force-dynamic";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
+const DEFAULT_OG_IMAGE = "/Inanh/logo_inanh24h.jpg";
 
 export const metadata: Metadata = {
   title: "Sản phẩm | In ảnh 24h",
   description: "Danh sách sản phẩm in ảnh, ảnh gỗ, album ảnh với báo giá minh bạch tại In ảnh 24h.",
-  alternates: { canonical: "/san-pham" },
+  alternates: {
+    canonical: `${SITE_URL}/san-pham`,
+    languages: {
+      "vi-VN": `${SITE_URL}/san-pham`,
+    },
+  },
   openGraph: {
     type: "website",
     locale: "vi_VN",
+    alternateLocale: "en_US",
     title: "Sản phẩm | In ảnh 24h",
     description: "Xem toàn bộ sản phẩm và tìm kiếm nhanh theo từ khóa.",
     url: `${SITE_URL}/san-pham`,
+    images: [{ url: DEFAULT_OG_IMAGE, alt: "In ảnh 24h" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Sản phẩm | In ảnh 24h",
     description: "Xem toàn bộ sản phẩm và tìm kiếm nhanh theo từ khóa.",
+    images: [DEFAULT_OG_IMAGE],
   },
 };
 
@@ -88,6 +97,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     },
   };
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Trang chủ", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Sản phẩm", item: `${SITE_URL}/san-pham` },
+    ],
+  };
+
   return (
     <div className="relative min-h-screen">
       <AmbientGlow />
@@ -124,6 +142,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       <FooterSection categories={categories} settings={siteSettings} />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
     </div>
   );
 }

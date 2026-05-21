@@ -8,13 +8,16 @@ import { getAdminMe, loginAdmin } from "./api";
 import { useAdminToken } from "./useAdminToken";
 
 const MODULE_LINKS = [
-  { href: "/admin/pages", label: "Pages", description: "Quan ly trang dong, SEO va noi dung website." },
-  { href: "/admin/menu", label: "Menu", description: "Quan ly thanh dieu huong." },
-  { href: "/admin/categories", label: "Danh muc", description: "Quan ly danh muc va hinh anh." },
-  { href: "/admin/products", label: "San pham", description: "CRUD san pham, gia sale, upload va hien thi." },
-  { href: "/admin/hero", label: "Hero", description: "Quan ly noi dung hero section." },
-  { href: "/admin/banners", label: "Banner", description: "Quan ly slider/banner trang chu." },
-  { href: "/admin/settings", label: "Cai dat", description: "Logo, footer, title, dia chi, hotline, email." },
+  { href: "/admin/pages", label: "Pages", description: "Quản lý trang động, SEO và nội dung website." },
+  { href: "/admin/menu", label: "Menu", description: "Quản lý thanh điều hướng." },
+  { href: "/admin/categories", label: "Danh mục", description: "Quản lý danh mục và hình ảnh." },
+  { href: "/admin/products", label: "Sản phẩm", description: "CRUD sản phẩm, giá sale, upload và hiển thị." },
+  { href: "/admin/orders", label: "Đơn hàng", description: "Quản lý đơn hàng và cập nhật trạng thái." },
+  { href: "/admin/drafts", label: "Lưu nháp", description: "Quản lý đơn hàng đang lưu nháp." },
+  { href: "/admin/users", label: "Users", description: "Quản lý tài khoản khách hàng." },
+  { href: "/admin/hero", label: "Hero", description: "Quản lý nội dung hero section." },
+  { href: "/admin/banners", label: "Banner", description: "Quản lý slider/banner trang chủ." },
+  { href: "/admin/settings", label: "Cài đặt", description: "Logo, footer, title, địa chỉ, hotline, email." },
 ];
 
 export default function AdminPage() {
@@ -29,14 +32,14 @@ export default function AdminPage() {
     if (!token) return;
     getAdminMe(token)
       .then((profile) => setAdminName(profile.username))
-      .catch((err) => setError(err instanceof Error ? err.message : "Phien dang nhap da het han."));
+      .catch((err) => setError(err instanceof Error ? err.message : "Phiên đăng nhập đã hết hạn."));
   }, [token]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     if (!username.trim() || !password.trim()) {
-      setError("Ten dang nhap va mat khau la bat buoc.");
+      setError("Tên đăng nhập và mật khẩu là bắt buộc.");
       return;
     }
     setLoading(true);
@@ -45,7 +48,7 @@ export default function AdminPage() {
       setToken(response.access_token);
       setPassword("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Dang nhap that bai.");
+      setError(err instanceof Error ? err.message : "Đăng nhập thất bại.");
     } finally {
       setLoading(false);
     }
@@ -55,10 +58,10 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen bg-stone-50 p-6">
         <div className="mx-auto max-w-md rounded-3xl border border-stone-200 bg-white p-6 shadow">
-          <h1 className="text-2xl font-semibold text-stone-900">Dang nhap quan tri</h1>
+          <h1 className="text-2xl font-semibold text-stone-900">Đăng nhập quản trị</h1>
           <form className="mt-4 space-y-3" onSubmit={handleLogin}>
             <label className="grid gap-1 text-sm font-medium text-stone-700">
-              Ten dang nhap
+              Tên đăng nhập
               <input
                 className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
                 value={username}
@@ -67,7 +70,7 @@ export default function AdminPage() {
               />
             </label>
             <label className="grid gap-1 text-sm font-medium text-stone-700">
-              Mat khau
+              Mật khẩu
               <input
                 type="password"
                 className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
@@ -78,7 +81,7 @@ export default function AdminPage() {
             </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button type="submit" className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white" disabled={loading}>
-              Dang nhap
+              Đăng nhập
             </button>
           </form>
         </div>
@@ -88,8 +91,8 @@ export default function AdminPage() {
 
   return (
     <AdminShell
-      title="Tong quan quan tri"
-      subtitle={`Xin chao ${adminName || "admin"}. Chon module ben trai de thao tac.`}
+      title="Tổng quan quản trị"
+      subtitle={`Xin chào ${adminName || "admin"}. Chọn module bên trái để thao tác.`}
       onLogout={logout}
     >
       {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}

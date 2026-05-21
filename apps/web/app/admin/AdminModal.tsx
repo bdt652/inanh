@@ -51,7 +51,7 @@ export default function AdminModal({
             onClick={onClose}
             className="rounded-lg border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-700"
           >
-            Dong
+            Đóng
           </button>
         </div>
         <div className="max-h-[70vh] overflow-auto px-5 py-4">{children}</div>

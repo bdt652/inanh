@@ -1,6 +1,8 @@
 ﻿import Link from "next/link";
 
+import Image from "next/image";
 import type { Category, SiteSetting } from "../lib/content";
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 import { toHtmlPath } from "../lib/paths";
 
 type FooterSectionProps = {
@@ -9,12 +11,22 @@ type FooterSectionProps = {
 };
 
 export default function FooterSection({ categories, settings }: FooterSectionProps) {
+  const logoSrc = settings?.logo_url ? normalizeImageUrl(settings.logo_url) : "/Inanh/logo_inanh24h.jpg";
+  const copyrightText = "© 2026 In ảnh 24h. All rights reserved.";
+
   return (
     <footer className="panel-plain reveal-up rounded-none border-t border-[var(--line)] px-4 py-10 md:px-8">
       <div className="grid w-full gap-7 md:grid-cols-[1.2fr_1fr]">
         <div className="space-y-3">
           <Link href="/" aria-label="Về trang chủ" className="block md:max-w-[180px]">
-            <img src={settings?.logo_url || "/Inanh/logo_inanh24h.jpg"} alt="Logo Inanh24h" className="h-auto w-full object-contain" />
+            <Image
+              src={logoSrc}
+              alt="Logo Inanh24h"
+              width={180}
+              height={60}
+              className="h-auto w-full object-contain"
+              unoptimized={shouldSkipImageOptimization(logoSrc)}
+            />
           </Link>
           {settings?.address && <p className="text-sm leading-7 text-[var(--text-soft)]">Địa chỉ: {settings.address}</p>}
           {settings?.hotline_zalo && <p className="text-sm text-[var(--text-soft)]">Hotline/Zalo: {settings.hotline_zalo}</p>}
@@ -35,11 +47,9 @@ export default function FooterSection({ categories, settings }: FooterSectionPro
           </div>
         </div>
       </div>
-      {settings?.footer && (
-        <p className="mt-8 border-t border-[var(--line)] px-6 pt-4 text-center text-xs text-[var(--text-soft)]">
-          {settings.footer}
-        </p>
-      )}
+      <p className="mt-8 border-t border-[var(--line)] px-6 pt-4 text-center text-xs text-[var(--text-soft)]">
+        {copyrightText}
+      </p>
     </footer>
   );
 }

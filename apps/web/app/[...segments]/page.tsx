@@ -1,4 +1,5 @@
 ﻿import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 
 import AmbientGlow from "../components/AmbientGlow";
@@ -8,10 +9,13 @@ import ProductGrid from "../components/ProductGrid";
 import ScrollProgress from "../components/ScrollProgress";
 import { getAllProducts, getBestSellers, getCategories, getMenuItems, getPageByPath, getSiteSettings } from "../lib/api";
 import type { ProductCard } from "../lib/content";
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 import { normalizePath, stripHtmlSuffix, toHtmlPath } from "../lib/paths";
+import { sanitizeRichHtml } from "../lib/sanitize";
 
 const SITE_NAME = "In ảnh 24h";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
+const DEFAULT_OG_IMAGE = "/Inanh/logo_inanh24h.jpg";
 
 export const dynamic = "force-dynamic";
 
@@ -95,13 +99,6 @@ function resolveFallbackSummary(categoryLabel?: string): string {
   return "Nội dung trang đang được cập nhật, vui lòng quay lại trong thời gian gần nhất.";
 }
 
-function resolveFallbackContent(categoryLabel?: string): string {
-  if (categoryLabel) {
-    return `Bạn có thể bổ sung nội dung SEO chi tiết cho danh mục ${categoryLabel} trong phần Pages để cải thiện khả năng tìm kiếm.`;
-  }
-  return "Bạn có thể bổ sung nội dung trang này trong phần Pages để hiển thị thông tin đầy đủ cho người dùng và công cụ tìm kiếm.";
-}
-
 function normalizeToken(value: string): string {
   return value
     .normalize("NFD")
@@ -110,12 +107,16 @@ function normalizeToken(value: string): string {
     .trim();
 }
 
-function sanitizeHtml(rawHtml: string): string {
-  return rawHtml
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-    .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+='[^']*'/gi, "")
-    .replace(/javascript:/gi, "");
+function escapeHtmlAttr(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+function ensureImageAlt(html: string, fallbackAlt: string): string {
+  const safeAlt = escapeHtmlAttr(fallbackAlt);
+  return html.replace(/<img\b([^>]*?)>/gi, (match, attrs) => {
+    if (/\balt\s*=/.test(attrs)) return match;
+    return `<img${attrs} alt="${safeAlt}">`;
+  });
 }
 
 function plainTextToHtml(rawText: string): string {
@@ -129,13 +130,17 @@ function plainTextToHtml(rawText: string): string {
     .join("");
 }
 
-function resolveRenderableContent(rawContent: string): string {
+function resolveRenderableContent(rawContent: string, fallbackAlt?: string): string {
   const trimmed = rawContent.trim();
   if (!trimmed) {
     return "";
   }
   const hasHtmlTag = /<[a-z][\s\S]*>/i.test(trimmed);
-  return hasHtmlTag ? sanitizeHtml(trimmed) : plainTextToHtml(trimmed);
+  if (!hasHtmlTag) {
+    return plainTextToHtml(trimmed);
+  }
+  const sanitized = sanitizeRichHtml(trimmed);
+  return fallbackAlt ? ensureImageAlt(sanitized, fallbackAlt) : sanitized;
 }
 
 export async function generateMetadata({ params }: DynamicPageProps): Promise<Metadata> {
@@ -163,6 +168,7 @@ export async function generateMetadata({ params }: DynamicPageProps): Promise<Me
   const summary = page?.summary || page?.content || resolveFallbackSummary(categoryMatch?.label);
   const description = toMetaDescription(summary);
   const shouldIndex = Boolean(page || categoryMatch);
+  const ogImage = categoryMatch?.img ? normalizeImageUrl(categoryMatch.img) : DEFAULT_OG_IMAGE;
 
   return {
     title,
@@ -181,11 +187,13 @@ export async function generateMetadata({ params }: DynamicPageProps): Promise<Me
       title,
       description,
       url: absoluteUrl(path),
+      images: [{ url: ogImage, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [ogImage],
     },
   };
 }
@@ -214,7 +222,7 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   const title = page?.title ?? categoryMatch?.label ?? menuMatch?.label ?? "Trang";
   const summary = page?.summary ?? "";
   const content = page?.content ?? "";
-  const renderedContent = resolveRenderableContent(content);
+  const renderedContent = resolveRenderableContent(content, title);
   const description = toMetaDescription(summary || content);
   const breadcrumb = buildBreadcrumb(path, title);
 
@@ -272,7 +280,15 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
           <h1 className="font-display text-4xl font-semibold md:text-5xl">{title}</h1>
           {categoryMatch?.img && (
             <div className="photo-frame mt-6 overflow-hidden rounded-none">
-              <img src={categoryMatch.img} alt={categoryMatch.label} className="h-full max-h-[360px] w-full object-cover" />
+              <Image
+                src={normalizeImageUrl(categoryMatch.img)}
+                alt={categoryMatch.label}
+                width={1200}
+                height={360}
+                sizes="100vw"
+                className="h-auto max-h-[360px] w-full object-cover"
+                unoptimized={shouldSkipImageOptimization(categoryMatch.img)}
+              />
             </div>
           )}
           {renderedContent && (

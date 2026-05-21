@@ -19,6 +19,7 @@ type GalleryPhoto = {
   status?: "uploading" | "ready" | "duplicate" | "error";
   key?: string;
   uploadError?: string;
+  copies?: number;
 };
 
 type GalleryLimits = {
@@ -32,6 +33,7 @@ type MassPhotoGalleryProps = {
   photos: GalleryPhoto[];
   onAddFiles: (files: File[]) => void;
   onRemovePhoto: (photoId: string) => void;
+  onChangeCopies?: (photoId: string, copies: number) => void;
   limits?: GalleryLimits;
 };
 
@@ -68,6 +70,7 @@ export default function MassPhotoGallery({
   photos,
   onAddFiles,
   onRemovePhoto,
+  onChangeCopies,
   limits,
 }: MassPhotoGalleryProps) {
   const [visibleCount, dispatchVisibleCount] = useReducer(visibleCountReducer, CHUNK_SIZE);
@@ -75,6 +78,7 @@ export default function MassPhotoGallery({
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filter, setFilter] = useState<"all" | "duplicates" | "new">("all");
   const [lightbox, setLightbox] = useState<GalleryPhoto | null>(null);
+  const [copiesInputs, setCopiesInputs] = useState<Record<string, string>>({});
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -82,7 +86,31 @@ export default function MassPhotoGallery({
     dispatchVisibleCount({ type: "reset" });
   }, [photos.length]);
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      setCopiesInputs((current) => {
+        const next: Record<string, string> = {};
+        const ids = new Set(photos.map((photo) => photo.id));
+        Object.keys(current).forEach((id) => {
+          if (ids.has(id)) {
+            next[id] = current[id];
+          }
+        });
+        photos.forEach((photo) => {
+          if (next[photo.id] === undefined) {
+            next[photo.id] = String(Math.max(1, Math.round(photo.copies ?? 1)));
+          }
+        });
+        return next;
+      });
+    });
+  }, [photos]);
+
   const totalBytes = useMemo(() => photos.reduce((sum, photo) => sum + (photo.size ?? 0), 0), [photos]);
+  const totalCopies = useMemo(
+    () => photos.reduce((sum, photo) => sum + Math.max(1, Math.round(photo.copies ?? 1)), 0),
+    [photos]
+  );
   const duplicatePhotos = useMemo(() => photos.filter((photo) => photo.status === "duplicate"), [photos]);
 
   const filteredPhotos = useMemo(() => {
@@ -145,8 +173,32 @@ export default function MassPhotoGallery({
     error: "border-red-400 text-red-700",
   };
 
+  const handleCopiesInput = (photoId: string, rawValue: string) => {
+    if (!onChangeCopies) return;
+    setCopiesInputs((current) => ({ ...current, [photoId]: rawValue }));
+    if (rawValue === "") return;
+    if (!/^\d+$/.test(rawValue)) return;
+    const parsed = Number.parseInt(rawValue, 10);
+    const nextValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    onChangeCopies(photoId, nextValue);
+  };
+
+  const handleCopiesBlur = (photoId: string) => {
+    if (!onChangeCopies) return;
+    const rawValue = copiesInputs[photoId] ?? "";
+    if (!rawValue || !/^\d+$/.test(rawValue)) {
+      setCopiesInputs((current) => ({ ...current, [photoId]: "1" }));
+      onChangeCopies(photoId, 1);
+      return;
+    }
+    const parsed = Number.parseInt(rawValue, 10);
+    const nextValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    setCopiesInputs((current) => ({ ...current, [photoId]: String(nextValue) }));
+    onChangeCopies(photoId, nextValue);
+  };
+
   return (
-    <div className="grid gap-6 rounded-[32px] border border-[var(--line,#e5e0d8)] bg-white/90 p-6 shadow-lg lg:grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr]">
+    <div className="grid gap-6 rounded-[32px] border border-[var(--line,#e5e0d8)] bg-white/90 p-4 shadow-lg lg:grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr] sm:p-6">
       <div className="space-y-5">
         <div className="space-y-1">
           <p className="text-xs font-semibold tracking-[0.08em] text-[var(--text-soft,#4a4034)]">{title}</p>
@@ -174,7 +226,7 @@ export default function MassPhotoGallery({
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-between gap-2 text-[0.65rem] tracking-[0.08em] text-[var(--text-soft,#4a4034)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[0.65rem] tracking-[0.08em] text-[var(--text-soft,#4a4034)]">
           <div className="flex gap-2">
             <button
               type="button"
@@ -195,16 +247,22 @@ export default function MassPhotoGallery({
         </div>
 
         <div className="divide-y divide-[var(--line,#e5e0d8)] space-y-4 text-sm text-[var(--text-soft,#4a4034)]">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span>Số ảnh</span>
             <span className="font-semibold text-[var(--text-main,#1f1b16)]">{photos.length}</span>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span>Ước lượng dung lượng</span>
             <span className="font-semibold text-[var(--text-main,#1f1b16)]">{formatBytes(totalBytes)}</span>
           </div>
+          {onChangeCopies && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>Tổng số bản in</span>
+              <span className="font-semibold text-[var(--text-main,#1f1b16)]">{totalCopies}</span>
+            </div>
+          )}
           {limits?.maxFiles && (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span>Giới hạn ảnh</span>
               <span className="font-semibold text-[var(--text-main,#1f1b16)]">
                 {photos.length}/{limits.maxFiles}
@@ -212,7 +270,7 @@ export default function MassPhotoGallery({
             </div>
           )}
           {limits?.maxBytes && (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span>Giới hạn dung lượng</span>
               <span className="font-semibold text-[var(--text-main,#1f1b16)]">
                 {formatBytes(limits.maxBytes)}
@@ -249,8 +307,8 @@ export default function MassPhotoGallery({
         <input ref={inputRef} type="file" multiple accept="image/*" className="hidden" onChange={handleFileInput} />
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between text-xs tracking-[0.08em] text-[var(--text-soft,#4a4034)]">
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs tracking-[0.08em] text-[var(--text-soft,#4a4034)]">
           <span>Preview gallery</span>
           <span>{visiblePhotos.length}/{photos.length}</span>
         </div>
@@ -262,7 +320,13 @@ export default function MassPhotoGallery({
                 onClick={() => setLightbox(photo)}
                 className="group relative cursor-pointer overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:border-[var(--accent,#b46a2f)]"
               >
-                <img src={photo.url} alt={photo.name} className="h-28 w-full object-cover" />
+                {photo.url ? (
+                  <img src={photo.url} alt={photo.name} className="h-28 w-full object-cover" />
+                ) : (
+                  <div className="flex h-28 w-full items-center justify-center bg-stone-100 text-[0.55rem] text-stone-500">
+                    Chưa có preview
+                  </div>
+                )}
                 <div className="p-2">
                   <p className="truncate text-[0.65rem] font-semibold text-[var(--text-main,#1f1b16)]">
                     {index + 1}. {photo.name}
@@ -276,6 +340,23 @@ export default function MassPhotoGallery({
                     </span>
                   )}
                   <p className="text-[0.55rem] text-[var(--text-soft,#4a4034)]">{photo.size ? formatBytes(photo.size) : "Không rõ dung lượng"}</p>
+                  {onChangeCopies && (
+                    <div
+                      className="mt-2 flex items-center justify-between text-[0.55rem] text-[var(--text-soft,#4a4034)]"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <span>Số lượt in</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={copiesInputs[photo.id] ?? String(Math.max(1, Math.round(photo.copies ?? 1)))}
+                        onChange={(event) => handleCopiesInput(photo.id, event.target.value)}
+                        onBlur={() => handleCopiesBlur(photo.id)}
+                        className="w-16 rounded-lg border border-stone-300 px-2 py-1 text-[0.6rem] focus:border-[var(--accent,#b46a2f)] focus:outline-none"
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                    </div>
+                  )}
                   {photo.uploadError && (
                     <p className="text-[0.55rem] text-red-600">{photo.uploadError}</p>
                   )}
@@ -299,15 +380,25 @@ export default function MassPhotoGallery({
               <div
                 key={photo.id}
                 onClick={() => setLightbox(photo)}
-                className="flex cursor-pointer items-center justify-between rounded-2xl border border-stone-200 bg-white px-3 py-3 text-sm shadow-sm transition hover:border-[var(--accent,#b46a2f)]"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white px-3 py-3 text-sm shadow-sm transition hover:border-[var(--accent,#b46a2f)]"
               >
-                <div>
-                  <p className="text-[0.75rem] font-semibold text-[var(--text-main,#1f1b16)]">
+                <div className="min-w-0">
+                  <p className="truncate text-[0.75rem] font-semibold text-[var(--text-main,#1f1b16)]">
                     {index + 1}. {photo.name}
                   </p>
-                  <p className="text-[0.65rem] text-[var(--text-soft,#4a4034)]">{photo.size ? formatBytes(photo.size) : "Dung lượng chưa xác định"}</p>
+                  <p className="truncate text-[0.65rem] text-[var(--text-soft,#4a4034)]">{photo.size ? formatBytes(photo.size) : "Dung lượng chưa xác định"}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                  {onChangeCopies && (
+                    <input
+                      type="number"
+                      min={1}
+                      value={copiesInputs[photo.id] ?? String(Math.max(1, Math.round(photo.copies ?? 1)))}
+                      onChange={(event) => handleCopiesInput(photo.id, event.target.value)}
+                      onBlur={() => handleCopiesBlur(photo.id)}
+                      className="w-16 rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-[var(--accent,#b46a2f)] focus:outline-none"
+                    />
+                  )}
                   {photo.status && (
                     <span
                       className={`rounded-full border px-2 py-1 text-[0.55rem] tracking-[0.08em] ${statusClassMap[photo.status]}`}
@@ -349,14 +440,20 @@ export default function MassPhotoGallery({
             className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white p-4"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-lg font-semibold text-[var(--text-main,#1f1b16)]">{lightbox.name}</h4>
               <button type="button" onClick={() => setLightbox(null)} className="text-sm text-red-600">
                 Đóng
               </button>
             </div>
             <div className="mt-4">
-              <img src={lightbox.url} alt={lightbox.name} className="max-h-[60vh] w-full object-contain" />
+              {lightbox.url ? (
+                <img src={lightbox.url} alt={lightbox.name} className="max-h-[60vh] w-full object-contain" />
+              ) : (
+                <div className="flex h-[50vh] w-full items-center justify-center rounded-xl border border-dashed border-stone-200 text-sm text-stone-500">
+                  Chưa có preview
+                </div>
+              )}
             </div>
             <p className="mt-3 text-sm text-[var(--text-soft,#4a4034)]">
               {filteredPhotos.findIndex((item) => item.id === lightbox.id) + 1} / {filteredPhotos.length} ·{" "}

@@ -8,7 +8,9 @@ import type { ReactQuillProps } from "react-quill";
 const ReactQuill = dynamic(
   async () => {
     const { default: RQ } = await import("react-quill");
-    return forwardRef<ReactQuillType, ReactQuillProps>((props, ref) => <RQ ref={ref} {...props} />);
+    const Component = forwardRef<ReactQuillType, ReactQuillProps>((props, ref) => <RQ ref={ref} {...props} />);
+    Component.displayName = "ReactQuill";
+    return Component;
   },
   { ssr: false }
 );

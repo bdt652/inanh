@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 
 import AdminModal from "../AdminModal";
 import AdminNeedLogin from "../AdminNeedLogin";
@@ -9,7 +10,11 @@ import ConfirmActionModal from "../ConfirmActionModal";
 import { createPage, deletePage, listPages, updatePage, uploadImage } from "../api";
 import type { PageRecord, PageUpsert } from "../types";
 import { useAdminToken } from "../useAdminToken";
-import PageContentEditor from "../PageContentEditor";
+
+const PageContentEditor = dynamic(() => import("../PageContentEditor"), {
+  ssr: false,
+  loading: () => <p className="text-xs text-stone-500">Đang tải trình soạn thảo...</p>,
+});
 
 const EMPTY_FORM: PageUpsert = {
   slug: "",
@@ -61,7 +66,7 @@ export default function AdminPagesListPage() {
     if (!token) return;
     listPages(token)
       .then((data) => setPages(sortByOrder(data)))
-      .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc danh sach trang."))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được danh sách trang."))
       .finally(() => setLoaded(true));
   }, [token]);
 
@@ -109,7 +114,7 @@ export default function AdminPagesListPage() {
     };
 
     if (!payload.slug || !payload.path || !payload.title.trim()) {
-      setError("Slug, path va title la bat buoc.");
+      setError("Slug, path và title là bắt buộc.");
       return;
     }
 
@@ -120,15 +125,15 @@ export default function AdminPagesListPage() {
       if (editingId) {
         const updated = await updatePage(token, editingId, payload);
         setPages((prev) => sortByOrder(prev.map((item) => (item.id === updated.id ? updated : item))));
-        setNotice("Da cap nhat trang.");
+        setNotice("Đã cập nhật trang.");
       } else {
         const created = await createPage(token, payload);
         setPages((prev) => sortByOrder([...prev, created]));
-        setNotice("Da tao trang.");
+        setNotice("Đã tạo trang.");
       }
       resetModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc trang.");
+      setError(err instanceof Error ? err.message : "Không lưu được trang.");
     } finally {
       setSaving(false);
     }
@@ -146,18 +151,18 @@ export default function AdminPagesListPage() {
     try {
       await deletePage(token, pendingDeleteId);
       setPages((prev) => prev.filter((item) => item.id !== pendingDeleteId));
-      setNotice("Da xoa trang.");
+      setNotice("Đã xóa trang.");
       setPendingDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong the xoa trang.");
+      setError(err instanceof Error ? err.message : "Không thể xóa trang.");
     } finally {
       setDeleting(false);
     }
   };
 
   const handleUploadContentImage = async (file: File): Promise<string> => {
-    if (!token) throw new Error("Chua dang nhap.");
-    const uploaded = await uploadImage(token, file);
+    if (!token) throw new Error("Chưa đăng nhập.");
+    const uploaded = await uploadImage(token, file, "content");
     return uploaded.url;
   };
 
@@ -166,11 +171,11 @@ export default function AdminPagesListPage() {
   return (
     <AdminShell
       title="Pages"
-      subtitle="Quan ly trang dong voi popup editor."
+      subtitle="Quản lý trang động với popup editor."
       onLogout={logout}
       actions={
         <button type="button" onClick={handleOpenCreate} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-          Them page
+          Thêm trang
         </button>
       }
     >
@@ -178,7 +183,7 @@ export default function AdminPagesListPage() {
       {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</p>}
 
       <section className="space-y-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <p className="text-sm text-stone-500">{loaded ? `${pages.length} pages` : "Dang tai..."}</p>
+        <p className="text-sm text-stone-500">{loaded ? `${pages.length} trang` : "Đang tải..."}</p>
         <div className="grid gap-3">
           {pages.map((page) => (
             <article key={page.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
@@ -186,7 +191,7 @@ export default function AdminPagesListPage() {
                 <div>
                   <p className="text-sm font-semibold text-stone-900">{page.title}</p>
                   <p className="text-xs text-stone-500">
-                    {page.path} · order {page.order} · {page.is_published ? "Published" : "Hidden"}
+                    {page.path} · order {page.order} · {page.is_published ? "Hiển thị" : "Ẩn"}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -195,32 +200,32 @@ export default function AdminPagesListPage() {
                     onClick={() => handleOpenEdit(page)}
                     className="rounded-lg border border-stone-300 px-3 py-1 text-xs text-stone-700"
                   >
-                    Sua
+                    Sửa
                   </button>
                   <button
                     type="button"
                     onClick={() => requestDelete(page.id)}
                     className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600"
                   >
-                    Xoa
+                    Xóa
                   </button>
                 </div>
               </div>
             </article>
           ))}
-          {loaded && pages.length === 0 && <p className="text-sm text-stone-500">Chua co trang nao.</p>}
+          {loaded && pages.length === 0 && <p className="text-sm text-stone-500">Chưa có trang nào.</p>}
         </div>
       </section>
 
       <AdminModal
         open={modalOpen}
         onClose={resetModal}
-        title={editing ? "Sua page" : "Them page"}
-        description="Nhap day du thong tin, moi truong deu co label ro rang."
+        title={editing ? "Sửa trang" : "Thêm trang"}
+        description="Nhập đầy đủ thông tin, mỗi trường đều có label rõ ràng."
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" onClick={resetModal} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
@@ -228,14 +233,14 @@ export default function AdminPagesListPage() {
               disabled={saving}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              {saving ? "Dang luu..." : "Luu"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         }
       >
         <form id="page-editor-form" className="space-y-3" onSubmit={handleSave}>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Tieu de
+            Tiêu đề
             <input
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.title}
@@ -259,12 +264,12 @@ export default function AdminPagesListPage() {
                   onClick={() => setForm((prev) => ({ ...prev, slug: slugify(prev.title || prev.slug) }))}
                   className="rounded-xl border border-stone-300 px-3 py-2 text-xs"
                 >
-                  Tao slug
+                  Tạo slug
                 </button>
               </div>
             </label>
             <label className="grid gap-1 text-sm font-semibold text-stone-700">
-              Path
+              Đường dẫn
               <input
                 className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
                 placeholder="/gioi-thieu"
@@ -276,7 +281,7 @@ export default function AdminPagesListPage() {
           </div>
 
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Tom tat
+            Tóm tắt
             <textarea
               className="min-h-20 rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.summary}
@@ -285,18 +290,18 @@ export default function AdminPagesListPage() {
           </label>
 
           <div className="grid gap-2 text-sm font-semibold text-stone-700">
-            <span>Noi dung</span>
+            <span>Nội dung</span>
             <PageContentEditor
               value={form.content}
               onChange={(next) => setForm((prev) => ({ ...prev, content: next }))}
               onUploadImage={handleUploadContentImage}
-              placeholder="Soan noi dung phong phu, ho tro dinh dang nhu Word."
+              placeholder="Soạn nội dung phong phú, hỗ trợ định dạng như Word."
             />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm font-semibold text-stone-700">
-              Thu tu hien thi
+              Thứ tự hiển thị
               <input
                 type="number"
                 min={0}
@@ -311,7 +316,7 @@ export default function AdminPagesListPage() {
                 checked={form.is_published}
                 onChange={(event) => setForm((prev) => ({ ...prev, is_published: event.target.checked }))}
               />
-              Publish ngay
+              Xuất bản ngay
             </label>
           </div>
         </form>
@@ -320,9 +325,9 @@ export default function AdminPagesListPage() {
       <ConfirmActionModal
         open={Boolean(pendingDeleteId)}
         busy={deleting}
-        title="Xac nhan xoa page"
-        description="Ban co chac chan muon xoa page nay khong?"
-        confirmLabel="Xoa page"
+        title="Xác nhận xóa trang"
+        description="Bạn có chắc chắn muốn xóa trang này không?"
+        confirmLabel="Xóa trang"
         onConfirm={() => void handleDelete()}
         onClose={() => setPendingDeleteId(null)}
       />

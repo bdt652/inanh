@@ -1,5 +1,7 @@
-﻿import Link from "next/link";
+﻿import Image from "next/image";
+import Link from "next/link";
 
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 import { toHtmlPath } from "../lib/paths";
 
 type Product = {
@@ -27,19 +29,6 @@ type ProductGridProps = {
   viewMoreHref?: string;
   viewMoreLabel?: string;
 };
-
-const HIDDEN_DESCRIPTION_SNIPPETS = [
-  "Ảnh in 13x18cm phù hợp với mọi loại ảnh, ảnh cưới, ảnh gia đình, ảnh trẻ em, ảnh kỷ yếu…Đảm bảo chất lượng ảnh với độ sắc nét cao.",
-  "Ảnh in 13x18cm phù hợp với mọi loại ảnh, ảnh cưới, ảnh gia đình, ảnh trẻ em, ảnh kỷ yếu...Đảm bảo chất lượng ảnh với độ sắc nét cao.",
-];
-
-function sanitizeDescription(value: string): string {
-  let next = value.trim();
-  HIDDEN_DESCRIPTION_SNIPPETS.forEach((snippet) => {
-    next = next.replace(snippet, "").trim();
-  });
-  return next;
-}
 
 function resolveProductDetailHref(product: Product): string | null {
   const rawSlug = (product.slug ?? product.id ?? "").trim();
@@ -74,7 +63,7 @@ export default function ProductGrid({
       {hasProducts ? (
         <div className="grid gap-5 md:grid-cols-3">
           {products.map((item, index) => {
-            const normalizedDescription = sanitizeDescription(item.description);
+            const descriptionText = (item.short || item.description || "").trim();
             const detailHref = resolveProductDetailHref(item);
             return (
               <article
@@ -84,7 +73,15 @@ export default function ProductGrid({
               >
                 <div className="photo-frame mb-4 h-44 p-3">
                   {item.image_url ? (
-                    <img src={item.image_url} alt={item.title} className="h-full w-full rounded-none object-cover" loading="lazy" />
+                    <Image
+                      src={normalizeImageUrl(item.image_url)}
+                      alt={item.title}
+                      width={640}
+                      height={420}
+                      sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                      className="h-full w-full rounded-none object-cover"
+                      unoptimized={item.image_url ? shouldSkipImageOptimization(item.image_url) : false}
+                    />
                   ) : (
                     <>
                       <div className="h-full rounded-none bg-gradient-to-br from-[#f5d8b2] via-[#e9bd8e] to-[#d99f69]" />
@@ -106,7 +103,6 @@ export default function ProductGrid({
                   </span>
                 )}
 
-                <p className="mt-2 text-sm text-[var(--text-soft)]">{item.short}</p>
                 <h3 className="mt-2 text-lg font-semibold leading-7">{item.title}</h3>
 
                 <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -114,7 +110,7 @@ export default function ProductGrid({
                   <span className="font-display text-3xl font-semibold text-[var(--accent-strong)]">{item.current_price}</span>
                 </div>
 
-                {normalizedDescription && <p className="mt-3 text-xs leading-6 text-[var(--text-soft)]">{normalizedDescription}</p>}
+                {descriptionText && <p className="mt-3 text-sm text-[var(--text-soft)]">{descriptionText}</p>}
 
                 {item.tags && item.tags.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2 text-[0.7rem]">

@@ -1,8 +1,0 @@
-# InAnh24h Project Rules
-
-1. Layout always flows edge-to-edge. Header, banner, main, and footer share the same `px-4 md:px-8` container padding, no rounded corners, and large blocks stay border-free unless explicitly emphasized with a shadow.
-2. Typography is locked to `--font-body` (Segoe UI) across body and heading styles; `.font-display` inherits that value so all titles stay sans-serif with consistent weight.
-3. Keep each file focused (<300 lines). When new behavior spans sections, extract small components or utility data in `app/components` or `app/lib`, and document the split in the component header.
-4. API integrations must live under `apps/api`, expose stable helpers, and document request/response pairs near the client call. Use shared DTOs and centralized base URLs so frontend hooks know which endpoints to hit.
-5. Search/utility rows on the header should hide when scrolling down but reappear on scroll-up, using animation classes plus a `display:none` fallback once the collapse animation finishes.
-6. When adding new data (products, hero copy), store it in `app/lib/content.ts` to keep the landing page components declarative and easy to repurpose.

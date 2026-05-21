@@ -1,5 +1,4 @@
 ﻿import type { Metadata } from "next";
-
 export const dynamic = "force-dynamic";
 
 import AmbientGlow from "./components/AmbientGlow";
@@ -19,6 +18,7 @@ import {
   getMenuItems,
   getSiteSettings,
 } from "./lib/api";
+import { normalizeImageUrl } from "./lib/image";
 import { toHtmlPath } from "./lib/paths";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
@@ -39,11 +39,13 @@ export async function generateMetadata(): Promise<Metadata> {
   const description =
     settings?.site_description ||
     "In ảnh online 24h, in nhanh chuẩn màu, báo giá minh bạch, hỗ trợ giao đúng hẹn.";
-  const ogImage = settings?.logo_url ? [{ url: settings.logo_url, alt: title }] : [];
+  const logoUrl = normalizeImageUrl(settings?.logo_url ?? "/Inanh/logo_inanh24h.jpg");
+  const ogImage = logoUrl ? [{ url: logoUrl, alt: title }] : [];
 
   return {
     title,
     description,
+    keywords: "in ảnh, in ảnh nhanh, in ảnh online, in ảnh giá rẻ, in ảnh lấy ngay, in album, in ảnh cưới, in ảnh khổ lớn, in tranh treo tường, in ảnh gỗ, in ảnh Hà Nội",
     alternates: { canonical: toHtmlPath("/") },
     openGraph: {
       type: "website",
@@ -90,6 +92,18 @@ export default async function Home() {
       logo: siteSettings?.logo_url ? { "@type": "ImageObject", url: siteSettings.logo_url } : undefined,
     },
   };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Trang chủ",
+        item: SITE_URL,
+      },
+    ],
+  };
   const howToJsonLd = {
     "@context": "https://schema.org",
     "@type": "HowTo",
@@ -117,6 +131,19 @@ export default async function Home() {
       { "@type": "HowToSupply", name: "Yêu cầu khổ in/vật liệu" },
     ],
     tool: [{ "@type": "HowToTool", name: "Máy in ảnh chuyên dụng" }],
+  };
+
+  const qaJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "QAPage",
+    mainEntity: {
+      "@type": "Question",
+      name: "In ảnh ở đâu chất lượng và giá rẻ?",
+      answer: {
+        "@type": "Answer",
+        text: "In ảnh 24h là địa chỉ in ảnh uy tín tại Hà Nội với hơn 10 năm kinh nghiệm. Chúng tôi cung cấp dịch vụ in ảnh chất lượng cao, giá cạnh tranh với nhiều kích thước và chất liệu đa dạng. Đặc biệt, in nhanh trong ngày, giao hàng tận nơi.",
+      },
+    },
   };
 
   return (
@@ -152,7 +179,9 @@ export default async function Home() {
       <FooterSection categories={categories} settings={siteSettings} />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(howToJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(qaJsonLd) }} />
     </div>
   );
 }

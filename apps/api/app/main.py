@@ -67,7 +67,11 @@ async def get_uploaded_media(object_path: str) -> Response:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Storage service is not available.",
         ) from exc
-    return Response(content=body, media_type=media_type)
+    headers = {
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
+    }
+    return Response(content=body, media_type=media_type, headers=headers)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"], summary="Health check")

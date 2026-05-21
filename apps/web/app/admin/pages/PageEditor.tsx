@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -8,7 +9,11 @@ import { createPage, listPages, updatePage, uploadImage } from "../../admin/api"
 import { TOKEN_KEY } from "../../admin/constants";
 import type { PageUpsert } from "../../admin/types";
 import { toHtmlPath } from "../../lib/paths";
-import PageContentEditor from "../PageContentEditor";
+
+const PageContentEditor = dynamic(() => import("../PageContentEditor"), {
+  ssr: false,
+  loading: () => <p className="text-xs text-stone-500">Đang tải trình soạn thảo...</p>,
+});
 
 const EMPTY_FORM: PageUpsert = {
   slug: "",
@@ -221,7 +226,7 @@ export default function PageEditor({ mode, pageId }: PageEditorProps) {
                 onUploadImage={async (file) => {
                   const authToken = ensureToken();
                   if (!authToken) throw new Error("Thiếu phiên đăng nhập.");
-                  const uploaded = await uploadImage(authToken, file);
+                  const uploaded = await uploadImage(authToken, file, "content");
                   return uploaded.url;
                 }}
                 placeholder="Soạn nội dung phong phú, dán từ Word, thêm ảnh, heading..."

@@ -5,13 +5,23 @@ from typing import List
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ROOT_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
+def _resolve_env_file() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        candidate = parent / ".env"
+        if candidate.exists():
+            return candidate
+    return current.parent / ".env"
+
+
+ROOT_ENV_FILE = _resolve_env_file()
 
 
 class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017"
     db_name: str = "inanh24h"
     admin_token_secret: str
+    admin_bootstrap_secret: str | None = None
     admin_token_ttl_seconds: int = 86400
     customer_token_secret: str = "change-this-customer-secret"
     customer_token_ttl_seconds: int = 604800  # 7 days
@@ -31,6 +41,7 @@ class Settings(BaseSettings):
     minio_root_password: str = "minio123"
     minio_bucket_name: str = "inanh24h-media"
     minio_secure: bool = False
+    minio_public_base_url: str | None = None  # e.g., https://media.inanh24h.com
     cors_allow_origins: List[str] = ["http://localhost:3000", "https://inanh24h.com", "https://www.inanh24h.com"]
 
     @field_validator("storage_backend")

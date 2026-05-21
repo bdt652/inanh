@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import { getProfile, type UserProfile } from "../lib/customer-api";
 import { useCustomerToken } from "../lib/use-customer-token";
@@ -11,12 +11,22 @@ const STORAGE_KEY = "customerToken";
 
 export default function AccountStatusCard() {
   const router = useRouter();
-  const token = useCustomerToken();
+  const { token, ready } = useCustomerToken();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const loginReturn = useMemo(() => {
+    const query = searchParams?.toString();
+    return `${pathname}${query ? `?${query}` : ""}`;
+  }, [pathname, searchParams]);
+
+  const loginHref = `/dang-nhap?return=${encodeURIComponent(loginReturn)}`;
+
   useEffect(() => {
+    if (!ready) return;
     if (!token) {
       queueMicrotask(() => {
         setProfile(null);
@@ -30,7 +40,7 @@ export default function AccountStatusCard() {
       .then((data) => setProfile(data))
       .catch((err) => setError(err instanceof Error ? err.message : "Không thể tải thông tin tài khoản."))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, ready]);
 
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_KEY);
@@ -40,17 +50,18 @@ export default function AccountStatusCard() {
 
   return (
     <div className="flex w-full max-w-[200px] flex-col gap-1 rounded-2xl bg-white/70 px-3 py-2 text-[0.55rem] uppercase tracking-[0.35em] text-[var(--text-soft,#4a4034)] shadow-lg sm:w-auto">
-      {loading && <p className="text-[0.6rem]">Đang tải...</p>}
+      {!ready && <p className="text-[0.6rem]">Đang kiểm tra...</p>}
+      {loading && ready && <p className="text-[0.6rem]">Đang tải...</p>}
       {profile && (
         <div className="space-y-0 text-[0.65rem] leading-tight text-[var(--text-main,#1f1b16)]">
           <p>SĐT: {profile.phone}</p>
           <p>Email: {profile.email || "Chưa cập nhật"}</p>
         </div>
       )}
-      {!profile && !loading && (
+      {!profile && !loading && ready && (
         <p className="text-[0.6rem]">
           Chưa đăng nhập.{" "}
-          <Link href="/dang-nhap" className="font-semibold text-[var(--accent-strong,#8a4d1f)] underline">
+          <Link href={loginHref} className="font-semibold text-[var(--accent-strong,#8a4d1f)] underline">
             Đăng nhập
           </Link>
         </p>

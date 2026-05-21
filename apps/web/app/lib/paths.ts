@@ -18,5 +18,8 @@ export function stripHtmlSuffix(rawPath: string): string {
 export function toHtmlPath(rawPath: string): string {
   const normalized = stripHtmlSuffix(rawPath);
   if (normalized === "/") return "/";
+  if (normalized === "/san-pham" || normalized === "/admin") {
+    return normalized;
+  }
   return `${normalized}.html`;
 }

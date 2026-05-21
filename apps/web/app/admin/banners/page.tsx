@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
 
 import AdminModal from "../AdminModal";
@@ -10,6 +11,7 @@ import ImageUploadField from "../ImageUploadField";
 import { createBanner, deleteBanner, listBanners, updateBanner, uploadImage } from "../api";
 import type { BannerRecord, BannerUpsert } from "../types";
 import { useAdminToken } from "../useAdminToken";
+import { shouldSkipImageOptimization } from "../../lib/image";
 
 const EMPTY_FORM: BannerUpsert = { alt: "", img: "", order: 0, is_active: true };
 
@@ -34,7 +36,7 @@ export default function AdminBannersPage() {
     if (!token) return;
     listBanners(token)
       .then((data) => setItems(sortByOrder(data)))
-      .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc banner."))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được banner."))
       .finally(() => setLoaded(true));
   }, [token]);
 
@@ -69,21 +71,21 @@ export default function AdminBannersPage() {
     try {
       const payload: BannerUpsert = { ...form, order: Math.max(0, form.order) };
       if (!payload.alt.trim() || !payload.img.trim()) {
-        setError("Alt va hinh banner la bat buoc.");
+        setError("Alt và hình banner là bắt buộc.");
         return;
       }
       if (editId) {
         const updated = await updateBanner(token, editId, payload);
         setItems((prev) => sortByOrder(prev.map((item) => (item.id === updated.id ? updated : item))));
-        setNotice("Da cap nhat banner.");
+        setNotice("Đã cập nhật banner.");
       } else {
         const created = await createBanner(token, payload);
         setItems((prev) => sortByOrder([...prev, created]));
-        setNotice("Da tao banner.");
+        setNotice("Đã tạo banner.");
       }
       resetModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc banner.");
+      setError(err instanceof Error ? err.message : "Không lưu được banner.");
     } finally {
       setSaving(false);
     }
@@ -101,10 +103,10 @@ export default function AdminBannersPage() {
     try {
       await deleteBanner(token, pendingDeleteId);
       setItems((prev) => prev.filter((item) => item.id !== pendingDeleteId));
-      setNotice("Da xoa banner.");
+      setNotice("Đã xóa banner.");
       setPendingDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong xoa duoc banner.");
+      setError(err instanceof Error ? err.message : "Không xóa được banner.");
     } finally {
       setDeleting(false);
     }
@@ -112,7 +114,7 @@ export default function AdminBannersPage() {
 
   const handleUpload = async (file: File) => {
     if (!token) return;
-    const uploaded = await uploadImage(token, file);
+    const uploaded = await uploadImage(token, file, "banner");
     setForm((prev) => ({ ...prev, img: uploaded.url }));
   };
 
@@ -121,11 +123,11 @@ export default function AdminBannersPage() {
   return (
     <AdminShell
       title="Banner"
-      subtitle="Popup co label ro rang va preview hinh anh."
+      subtitle="Popup có label rõ ràng và preview hình ảnh."
       onLogout={logout}
       actions={
         <button type="button" onClick={openCreate} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-          Them banner
+          Thêm banner
         </button>
       }
     >
@@ -133,52 +135,59 @@ export default function AdminBannersPage() {
       {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</p>}
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} banner` : "Dang tai..."}</p>
+        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} banner` : "Đang tải..."}</p>
         <div className="grid gap-3 md:grid-cols-2">
           {items.map((item) => (
             <article key={item.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
               <div className="flex gap-3">
-                <div className="h-16 w-20 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-white">
+                <div className="h-16 w-20 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-white relative">
                   {item.img ? (
-                    <img src={item.img} alt={item.alt} className="h-full w-full object-cover" />
+                    <Image
+                      src={item.img}
+                      alt={item.alt}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                      unoptimized={shouldSkipImageOptimization(item.img)}
+                    />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[10px] text-stone-400">No image</div>
+                    <div className="flex h-full items-center justify-center text-[10px] text-stone-400">Chưa có ảnh</div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-stone-900">{item.alt}</p>
                   <p className="text-xs text-stone-500">
-                    order {item.order} · {item.is_active ? "active" : "inactive"}
+                    order {item.order} · {item.is_active ? "đang hiển thị" : "ẩn"}
                   </p>
                   <div className="mt-2 flex gap-2">
                     <button type="button" onClick={() => openEdit(item)} className="rounded-lg border border-stone-300 px-3 py-1 text-xs">
-                      Sua
+                      Sửa
                     </button>
                     <button
                       type="button"
                       onClick={() => requestDelete(item.id)}
                       className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600"
                     >
-                      Xoa
+                      Xóa
                     </button>
                   </div>
                 </div>
               </div>
             </article>
           ))}
-          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chua co banner nao.</p>}
+          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chưa có banner nào.</p>}
         </div>
       </section>
 
       <AdminModal
         open={modalOpen}
         onClose={resetModal}
-        title={editId ? "Sua banner" : "Them banner"}
-        description="Upload hinh va xem preview ngay trong popup."
+        title={editId ? "Sửa banner" : "Thêm banner"}
+        description="Upload hình và xem preview ngay trong popup."
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" onClick={resetModal} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
@@ -186,7 +195,7 @@ export default function AdminBannersPage() {
               disabled={saving}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              {saving ? "Dang luu..." : "Luu"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         }
@@ -204,15 +213,16 @@ export default function AdminBannersPage() {
 
           <ImageUploadField
             id="banner-image"
-            label="Banner image"
+            label="Hình banner"
             value={form.img}
             onChange={(value) => setForm((prev) => ({ ...prev, img: value }))}
             onUpload={handleUpload}
-            hint="Khuyen nghi anh ngang de hien thi dep tren slider."
+            recommendedSize="1920x730"
+            hint="Khuyến nghị ảnh ngang để hiển thị đẹp trên slider."
           />
 
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Thu tu hien thi
+            Thứ tự hiển thị
             <input
               type="number"
               min={0}
@@ -228,7 +238,7 @@ export default function AdminBannersPage() {
               checked={form.is_active}
               onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
             />
-            Hien thi banner nay
+            Hiển thị banner này
           </label>
         </form>
       </AdminModal>
@@ -236,9 +246,9 @@ export default function AdminBannersPage() {
       <ConfirmActionModal
         open={Boolean(pendingDeleteId)}
         busy={deleting}
-        title="Xac nhan xoa banner"
-        description="Ban co chac chan muon xoa banner nay khong?"
-        confirmLabel="Xoa banner"
+        title="Xác nhận xóa banner"
+        description="Bạn có chắc chắn muốn xóa banner này không?"
+        confirmLabel="Xóa banner"
         onConfirm={() => void handleDelete()}
         onClose={() => setPendingDeleteId(null)}
       />

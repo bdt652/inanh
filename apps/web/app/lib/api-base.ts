@@ -32,3 +32,15 @@ export const resolveUploadsBase = (): string => {
   const root = stripApiPrefix(apiBase);
   return `${trimTrailingSlashes(root)}/uploads`;
 };
+
+// Resolve the base URL for uploaded files.
+// If MINIO_PUBLIC_BASE_URL is set, returns direct MinIO URLs (e.g., https://media.inanh24h.com).
+// Otherwise, returns backend proxy URLs (e.g., https://api.inanh24h.com/uploads).
+export const resolveFileBase = (): string => {
+  const minioPublic = process.env.NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL?.trim();
+  if (minioPublic) {
+    return trimTrailingSlashes(minioPublic);
+  }
+  // Fallback to backend proxy
+  return resolveUploadsBase();
+};

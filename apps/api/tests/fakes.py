@@ -1,7 +1,7 @@
 import re
 
 from bson import ObjectId
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 
 class FakeInsertResult:
@@ -36,6 +36,16 @@ class FakeCollection:
     def __init__(self, docs: list[dict] | None = None) -> None:
         self.docs: list[dict] = [doc.copy() for doc in (docs or [])]
         self.unique_constraints: list[tuple[str, ...]] = []
+        self.indexes: dict[str, dict] = {}
+
+    def _resolve_path(self, doc: dict, path: str) -> tuple[dict, str]:
+        parts = path.split(".")
+        current = doc
+        for part in parts[:-1]:
+            if part not in current or not isinstance(current[part], dict):
+                current[part] = {}
+            current = current[part]
+        return current, parts[-1]
 
     async def create_index(
         self,
@@ -43,8 +53,10 @@ class FakeCollection:
         unique: bool = False,
         name: str | None = None,
         sparse: bool = False,
+        **kwargs,
     ) -> str:
         _ = sparse
+        index_name = name or "idx_1"
         if unique:
             if isinstance(field, str):
                 constraint = (field,)
@@ -52,13 +64,36 @@ class FakeCollection:
                 constraint = tuple(key for key, _ in field)
             if constraint not in self.unique_constraints:
                 self.unique_constraints.append(constraint)
-        return name or "idx_1"
+        self.indexes[index_name] = {
+            "unique": unique,
+            "partialFilterExpression": kwargs.get("partialFilterExpression"),
+            "expireAfterSeconds": kwargs.get("expireAfterSeconds"),
+        }
+        return index_name
+
+    async def index_information(self) -> dict:
+        return {name: info.copy() for name, info in self.indexes.items()}
+
+    async def drop_index(self, name: str) -> None:
+        if name not in self.indexes:
+            raise OperationFailure("index not found")
+        self.indexes.pop(name, None)
 
     def _matches_scalar(self, field_value: object, condition: object) -> bool:
         if isinstance(condition, dict):
             if "$exists" in condition:
                 exists = field_value is not None
                 return exists == bool(condition["$exists"])
+            if "$in" in condition:
+                values = condition.get("$in") or []
+                return field_value in values
+            if "$type" in condition:
+                type_name = str(condition.get("$type", ""))
+                if type_name == "string":
+                    return isinstance(field_value, str)
+                if type_name == "number":
+                    return isinstance(field_value, (int, float))
+                return False
             if "$ne" in condition:
                 return field_value != condition["$ne"]
             if "$regex" in condition:
@@ -112,7 +147,34 @@ class FakeCollection:
             return FakeUpdateResult(0)
 
         candidate = self.docs[target_idx].copy()
-        candidate.update(update.get("$set", {}))
+        if "$set" in update:
+            for key, value in update.get("$set", {}).items():
+                if "." in key:
+                    container, leaf = self._resolve_path(candidate, key)
+                    container[leaf] = value
+                else:
+                    candidate[key] = value
+
+        if "$inc" in update:
+            for key, delta in update.get("$inc", {}).items():
+                container, leaf = self._resolve_path(candidate, key)
+                current = container.get(leaf, 0)
+                container[leaf] = current + delta
+
+        if "$addToSet" in update:
+            for key, value in update.get("$addToSet", {}).items():
+                container, leaf = self._resolve_path(candidate, key)
+                existing = container.get(leaf)
+                if not isinstance(existing, list):
+                    existing = []
+                if isinstance(value, dict) and "$each" in value:
+                    items = value["$each"]
+                else:
+                    items = [value]
+                for item in items:
+                    if item not in existing:
+                        existing.append(item)
+                container[leaf] = existing
 
         for constraint in self.unique_constraints:
             if any(candidate.get(field) is None for field in constraint):

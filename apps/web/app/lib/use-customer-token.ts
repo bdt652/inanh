@@ -21,15 +21,19 @@ const readStoredToken = (): string | null => {
   }
 };
 
-export function useCustomerToken() {
+export function useCustomerToken(): { token: string | null; ready: boolean } {
   const [token, setToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setToken(readStoredToken());
-    const handleStorage = () => setToken(readStoredToken());
+    queueMicrotask(() => {
+      setToken(readStoredToken());
+      setReady(true);
+    });
+    const handleStorage = () => queueMicrotask(() => setToken(readStoredToken()));
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  return token;
+  return { token, ready };
 }

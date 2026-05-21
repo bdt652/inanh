@@ -28,6 +28,7 @@ export type ProductCard = {
   tags?: string[];
   extra_options?: string[];
   allow_online_order?: boolean;
+  pricing_mode?: "combo" | "retail";
   min_images?: number | null;
   max_images?: number | null;
 };
@@ -42,9 +43,12 @@ export type ProductDetail = {
   image_url: string;
   image_urls: string[];
   short_description: string;
+  content?: string;
   allow_online_order?: boolean;
+  pricing_mode?: "combo" | "retail";
   min_images?: number | null;
   max_images?: number | null;
+  is_active?: boolean;
 };
 
 export type Banner = {

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
 
 import AdminModal from "../AdminModal";
@@ -9,6 +10,7 @@ import ImageUploadField from "../ImageUploadField";
 import { getSettings, upsertSettings, uploadImage } from "../api";
 import type { SettingsUpsert } from "../types";
 import { useAdminToken } from "../useAdminToken";
+import { shouldSkipImageOptimization } from "../../lib/image";
 
 const EMPTY_FORM: SettingsUpsert = {
   logo_url: "",
@@ -55,7 +57,7 @@ export default function AdminSettingsPage() {
           upload_require_verified_phone_threshold: settings.upload_require_verified_phone_threshold ?? undefined,
         });
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc cai dat."))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được cài đặt."))
       .finally(() => setLoaded(true));
   }, [token]);
 
@@ -80,10 +82,10 @@ export default function AdminSettingsPage() {
         upload_max_bytes: saved.upload_max_bytes ?? undefined,
         upload_require_verified_phone_threshold: saved.upload_require_verified_phone_threshold ?? undefined,
       });
-      setNotice("Da luu cai dat.");
+      setNotice("Đã lưu cài đặt.");
       setModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc cai dat.");
+      setError(err instanceof Error ? err.message : "Không lưu được cài đặt.");
     } finally {
       setSaving(false);
     }
@@ -91,7 +93,7 @@ export default function AdminSettingsPage() {
 
   const handleUploadLogo = async (file: File) => {
     if (!token) return;
-    const uploaded = await uploadImage(token, file);
+    const uploaded = await uploadImage(token, file, "logo");
     setForm((prev) => ({ ...prev, logo_url: uploaded.url }));
   };
 
@@ -99,8 +101,8 @@ export default function AdminSettingsPage() {
 
   return (
     <AdminShell
-      title="Cai dat"
-      subtitle="Quan ly cau hinh website voi popup va preview logo."
+      title="Cài đặt"
+      subtitle="Quản lý cấu hình website với popup và preview logo."
       onLogout={logout}
       actions={
         <button
@@ -108,7 +110,7 @@ export default function AdminSettingsPage() {
           onClick={() => setModalOpen(true)}
           className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
         >
-          Chinh sua cai dat
+          Chỉnh sửa cài đặt
         </button>
       }
     >
@@ -119,10 +121,17 @@ export default function AdminSettingsPage() {
         <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Logo preview</p>
           {form.logo_url ? (
-            <img src={form.logo_url} alt="logo" className="max-h-36 w-full rounded-lg object-contain" />
+            <Image
+              src={form.logo_url}
+              alt="logo"
+              width={640}
+              height={288}
+              className="max-h-36 w-full rounded-lg object-contain"
+              unoptimized={shouldSkipImageOptimization(form.logo_url)}
+            />
           ) : (
             <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-stone-300 text-xs text-stone-500">
-              Chua co logo
+              Chưa có logo
             </div>
           )}
         </div>
@@ -132,19 +141,19 @@ export default function AdminSettingsPage() {
           <p><span className="font-semibold text-stone-900">Hotline:</span> {form.hotline_zalo || "-"}</p>
           <p><span className="font-semibold text-stone-900">Address:</span> {form.address || "-"}</p>
           <p><span className="font-semibold text-stone-900">Footer:</span> {form.footer || "-"}</p>
-          <p><span className="font-semibold text-stone-900">Status:</span> {loaded ? "Da tai du lieu" : "Dang tai..."}</p>
+          <p><span className="font-semibold text-stone-900">Trạng thái:</span> {loaded ? "Đã tải dữ liệu" : "Đang tải..."}</p>
         </div>
       </section>
 
       <AdminModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Chinh sua cai dat"
-        description="Tat ca input deu co label ro rang, bao gom upload logo."
+        title="Chỉnh sửa cài đặt"
+        description="Tất cả input đều có label rõ ràng, bao gồm upload logo."
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
@@ -152,7 +161,7 @@ export default function AdminSettingsPage() {
               disabled={saving}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              {saving ? "Dang luu..." : "Luu"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         }
@@ -165,12 +174,13 @@ export default function AdminSettingsPage() {
               value={form.logo_url}
               onChange={(value) => setForm((prev) => ({ ...prev, logo_url: value }))}
               onUpload={handleUploadLogo}
+              recommendedSize="400x120"
               hint="Upload logo de xem ngay trong popup."
             />
           </div>
 
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Tieu de website
+            Tiêu đề website
             <input
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.title}
@@ -187,7 +197,7 @@ export default function AdminSettingsPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700 md:col-span-2">
-            Dia chi
+            Địa chỉ
             <input
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.address}
@@ -205,7 +215,7 @@ export default function AdminSettingsPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Toi thieu so anh / don
+            Tối thiểu số ảnh / đơn
             <input
               type="number"
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
@@ -222,7 +232,7 @@ export default function AdminSettingsPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Gioi han so anh / don
+            Giới hạn số ảnh / đơn
             <input
               type="number"
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
@@ -239,7 +249,7 @@ export default function AdminSettingsPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Gioi han dung luong (bytes)
+            Giới hạn dung lượng (bytes)
             <input
               type="number"
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
@@ -256,7 +266,7 @@ export default function AdminSettingsPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700 md:col-span-2">
-            Yeu cau xac thuc so dien thoai khi so anh &gt;=
+            Yêu cầu xác thực số điện thoại khi số ảnh &gt;=
             <input
               type="number"
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"

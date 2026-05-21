@@ -74,6 +74,7 @@ async def ensure_indexes(db: AsyncIOMotorDatabase | None = None) -> None:
         "user_id",
         name="idx_order_user_id",
     )
+    await _create_index_safe(database["upload_sessions"], "expires_at", expireAfterSeconds=0, name="ttl_upload_sessions")
     await _create_index_safe(database["product_views"], "id", unique=True, sparse=True, name="uniq_product_view_id")
 
 

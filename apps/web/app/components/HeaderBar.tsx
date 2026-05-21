@@ -1,11 +1,13 @@
 ﻿"use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { getProfile, type UserProfile } from "../lib/customer-api";
 import type { MenuItem } from "../lib/content";
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 import { useCustomerToken } from "../lib/use-customer-token";
 import { toHtmlPath } from "../lib/paths";
 
@@ -23,18 +25,24 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
   const router = useRouter();
   const lastScroll = useRef(0);
   const hideRef = useRef(false);
-  const token = useCustomerToken();
-  const [hydrated, setHydrated] = useState(false);
+  const { token, ready } = useCustomerToken();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState("");
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-  const showAccountMenu = hydrated && Boolean(token);
-  const authReady = hydrated;
+  const showAccountMenu = ready && Boolean(token);
+  const authReady = ready;
+  const logoSrc = logoUrl ? normalizeImageUrl(logoUrl) : "/Inanh/logo_inanh24h.jpg";
+
+  const loginReturn = useMemo(() => {
+    const query = searchParams?.toString();
+    return `${pathname}${query ? `?${query}` : ""}`;
+  }, [pathname, searchParams]);
+
+  const loginHref = `/dang-nhap?return=${encodeURIComponent(loginReturn)}`;
 
   useEffect(() => {
     hideRef.current = hideSearch;
@@ -77,14 +85,18 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
 
   useEffect(() => {
     if (!token) {
-      setProfile(null);
-      setProfileLoading(false);
-      setProfileError("");
+      queueMicrotask(() => {
+        setProfile(null);
+        setProfileLoading(false);
+        setProfileError("");
+      });
       return;
     }
     let active = true;
-    setProfileLoading(true);
-    setProfileError("");
+    queueMicrotask(() => {
+      setProfileLoading(true);
+      setProfileError("");
+    });
     getProfile(token)
       .then((data) => {
         if (active) {
@@ -157,10 +169,13 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
       >
         <div className="flex flex-wrap items-center justify-between gap-6">
           <Link href="/" aria-label="Về trang chủ" className="inline-block">
-            <img
-              src={logoUrl || "/Inanh/logo_inanh24h.jpg"}
+            <Image
+              src={logoSrc}
               alt="Logo Inanh24h"
+              width={200}
+              height={60}
               className="h-auto w-[150px] object-contain sm:w-[200px]"
+              unoptimized={shouldSkipImageOptimization(logoSrc)}
             />
           </Link>
           <nav className="flex flex-wrap items-center justify-end gap-3 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-soft)] md:text-base">
@@ -242,8 +257,8 @@ export default function HeaderBar({ menuItems, logoUrl }: HeaderBarProps) {
               </div>
             ) : (
               <Link
-                href={toHtmlPath("/dang-nhap")}
-                className="rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm hover:brightness-110"
+                href={loginHref}
+                className="inline-flex h-10 w-[140px] items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm hover:brightness-110"
               >
                 Đăng nhập
               </Link>

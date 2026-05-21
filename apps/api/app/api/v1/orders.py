@@ -34,14 +34,38 @@ def _normalize_products(payloads: list[OrderProductPayload]) -> list[dict]:
     normalized: list[dict] = []
     for item in payloads:
         selected_slug = item.selected_product_slug.strip() if item.selected_product_slug else None
+        copies_per_image = int(item.copies_per_image or 1)
+        if copies_per_image < 1:
+            copies_per_image = 1
+        image_copies = []
+        for entry in item.image_copies or []:
+            key = str(entry.key).strip()
+            if not key:
+                continue
+            copies = int(entry.copies or 1)
+            if copies < 1:
+                copies = 1
+            image_copies.append({"key": key, "copies": copies})
+        images = item.images
+        if not images and image_copies:
+            images = [entry["key"] for entry in image_copies]
+        quantity = int(item.quantity)
+        if image_copies:
+            quantity = sum(entry["copies"] for entry in image_copies)
+        elif images:
+            quantity = len(images) * copies_per_image
+        if quantity < 1:
+            quantity = 1
         normalized.append(
             {
                 "id": uuid4().hex,
                 "name": item.name.strip(),
-                "quantity": int(item.quantity),
+                "quantity": quantity,
+                "copies_per_image": copies_per_image,
                 "notes": item.notes.strip() if item.notes else None,
                 "options": [str(option).strip() for option in item.options if str(option).strip()],
-                "images": item.images,
+                "images": images,
+                "image_copies": image_copies,
                 "selected_product_slug": selected_slug,
             }
         )
@@ -49,12 +73,23 @@ def _normalize_products(payloads: list[OrderProductPayload]) -> list[dict]:
 
 
 def _serialize_product(doc: dict) -> OrderProduct:
+    image_copies = []
+    for entry in doc.get("image_copies", []) or []:
+        key = str(entry.get("key", "")).strip() if isinstance(entry, dict) else ""
+        if not key:
+            continue
+        copies = int(entry.get("copies", 1)) if isinstance(entry, dict) else 1
+        if copies < 1:
+            copies = 1
+        image_copies.append({"key": key, "copies": copies})
     return OrderProduct(
         id=str(doc.get("id")),
         name=str(doc.get("name", "")),
         quantity=int(doc.get("quantity", 0)),
+        copies_per_image=int(doc.get("copies_per_image") or 1),
         notes=str(doc.get("notes", "")) if doc.get("notes") else None,
         images=[str(url) for url in doc.get("images", []) if str(url).strip()],
+        image_copies=image_copies,
         options=[str(option) for option in doc.get("options", []) if str(option).strip()],
         selected_product_slug=str(doc.get("selected_product_slug")).strip()
         if doc.get("selected_product_slug")
@@ -102,10 +137,10 @@ async def _assert_online_order_allowed(
             deduped[key] = doc
 
     names = [str(doc.get("name") or doc.get("slug") or "") for doc in deduped.values()]
-    readable = ", ".join([name for name in names if name]) or "mot so san pham"
+    readable = ", ".join([name for name in names if name]) or "một số sản phẩm"
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"San pham chi nhan dat qua Zalo: {readable}.",
+        detail=f"Sản phẩm chỉ nhận đặt qua Zalo: {readable}.",
     )
 
 
@@ -122,12 +157,12 @@ async def _assert_image_limits(payloads: list[OrderProductPayload], db: AsyncIOM
     if min_total > 0 and total_images < min_total:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Can toi thieu {min_total} anh de gui don.",
+            detail=f"Cần tối thiểu {min_total} ảnh để gửi đơn.",
         )
     if max_total > 0 and total_images > max_total:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Vuot qua toi da {max_total} anh cho phep.",
+            detail=f"Vượt quá tối đa {max_total} ảnh cho phép.",
         )
     slugs = {
         item.selected_product_slug.strip()
@@ -150,7 +185,6 @@ async def _assert_image_limits(payloads: list[OrderProductPayload], db: AsyncIOM
         products_by_name = {str(doc.get("name")): doc for doc in docs if doc.get("name")}
 
     for item in payloads:
-        count = len(item.images)
         doc = None
         if item.selected_product_slug and item.selected_product_slug.strip():
             doc = products_by_slug.get(item.selected_product_slug.strip())
@@ -159,18 +193,51 @@ async def _assert_image_limits(payloads: list[OrderProductPayload], db: AsyncIOM
 
         min_limit = doc.get("min_images") if doc and doc.get("min_images") is not None else None
         max_limit = doc.get("max_images") if doc and doc.get("max_images") is not None else None
+        image_count = len(item.images) if item.images else len(item.image_copies or [])
+        copies_per_image = int(item.copies_per_image or 1)
+        if copies_per_image < 1:
+            copies_per_image = 1
+        if item.image_copies:
+            copies_count = sum(max(1, int(entry.copies or 1)) for entry in item.image_copies)
+        else:
+            copies_count = image_count * copies_per_image
+
+        pricing_mode = str(doc.get("pricing_mode") or "").lower() if doc else ""
+        if pricing_mode == "combo":
+            if min_limit is None and max_limit is not None:
+                min_limit = max_limit
+            if max_limit is None and min_limit is not None:
+                max_limit = min_limit
+        count = copies_count
+        unit = "b?n in"
 
         if min_limit is not None and min_limit > 0 and count < min_limit:
-            label = item.name.strip() or "San pham"
+            label = item.name.strip() or "S?n ph?m"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{label} can toi thieu {min_limit} anh.",
+                detail=f"{label} c?n t?i thi?u {min_limit} {unit}.",
             )
         if max_limit is not None and max_limit > 0 and count > max_limit:
-            label = item.name.strip() or "San pham"
+            label = item.name.strip() or "S?n ph?m"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{label} vuot qua toi da {max_limit} anh.",
+                detail=f"{label} v??t qu? t?i ?a {max_limit} {unit}.",
+            )
+
+        min_limit = doc.get("min_images") if doc and doc.get("min_images") is not None else None
+        max_limit = doc.get("max_images") if doc and doc.get("max_images") is not None else None
+
+        if min_limit is not None and min_limit > 0 and count < min_limit:
+            label = item.name.strip() or "Sản phẩm"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{label} cần tối thiểu {min_limit} ảnh.",
+            )
+        if max_limit is not None and max_limit > 0 and count > max_limit:
+            label = item.name.strip() or "Sản phẩm"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{label} vượt quá tối đa {max_limit} ảnh.",
             )
 
 
@@ -196,6 +263,9 @@ def _serialize_detail(doc: dict) -> OrderDetail:
         updated_at=_to_timestamp(updated),
         created_at=_to_timestamp(created),
         note=str(doc.get("note", "")) if doc.get("note") else None,
+        shipping_name=str(doc.get("shipping_name", "")) if doc.get("shipping_name") else None,
+        shipping_phone=str(doc.get("shipping_phone", "")) if doc.get("shipping_phone") else None,
+        shipping_address=str(doc.get("shipping_address", "")) if doc.get("shipping_address") else None,
         products=[_serialize_product(product) for product in doc.get("products", [])],
     )
 
@@ -234,6 +304,9 @@ async def create_order(
         "total_products": len(normalized_products),
         "total_images": total_images,
         "note": payload.note.strip() if payload.note else None,
+        "shipping_name": payload.shipping_name.strip() if payload.shipping_name else None,
+        "shipping_phone": payload.shipping_phone.strip() if payload.shipping_phone else None,
+        "shipping_address": payload.shipping_address.strip() if payload.shipping_address else None,
         "created_at": now,
         "updated_at": now,
     }
@@ -267,6 +340,12 @@ async def update_order(
             update_data["status"] = status_value
     if payload.note is not None:
         update_data["note"] = payload.note.strip() or None
+    if payload.shipping_name is not None:
+        update_data["shipping_name"] = payload.shipping_name.strip() or None
+    if payload.shipping_phone is not None:
+        update_data["shipping_phone"] = payload.shipping_phone.strip() or None
+    if payload.shipping_address is not None:
+        update_data["shipping_address"] = payload.shipping_address.strip() or None
     if payload.products is not None:
         await _assert_image_limits(payload.products, db)
         await _assert_online_order_allowed(payload.products, db)

@@ -1,8 +1,10 @@
+import io
 from pathlib import Path
 from shutil import rmtree
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from app.core.config import settings
 from app.core import uploads as upload_config
@@ -10,6 +12,13 @@ from app.db.mongo import get_db
 from app.main import app
 from tests.auth_helpers import login_headers, seed_admin
 from tests.fakes import FakeDB
+
+
+def _make_png_image(width: int = 64, height: int = 64) -> bytes:
+    """Generate a real PNG image using PIL."""
+    buf = io.BytesIO()
+    Image.new("RGB", (width, height), color=(255, 0, 0)).save(buf, format="PNG")
+    return buf.getvalue()
 
 
 client = TestClient(app)
@@ -223,7 +232,7 @@ def test_content_image_upload_success_and_validation_failure() -> None:
 
         uploaded = client.post(
             "/api/v1/content/uploads/images",
-            content=b"\x89PNG\r\n\x1a\ncontent",
+            content=_make_png_image(),
             headers={**headers, "Content-Type": "image/png", "X-File-Name": "banner.png"},
         )
         assert uploaded.status_code == 201
@@ -370,7 +379,7 @@ def test_hero_crud_flow_and_conflicts() -> None:
         headers = login_headers(client)
         created = client.post(
             "/api/v1/content/hero",
-            json={"title": "In nhanh trong ngay", "description": "Xu ly va giao nhanh", "order": 1},
+            json={"title": "In nhanh trong ngày", "description": "Xử lý và giao nhanh", "order": 1},
             headers=headers,
         )
         assert created.status_code == 201
@@ -378,7 +387,7 @@ def test_hero_crud_flow_and_conflicts() -> None:
 
         duplicate = client.post(
             "/api/v1/content/hero",
-            json={"title": "In nhanh trong ngay", "description": "Mo ta khac", "order": 2},
+            json={"title": "In nhanh trong ngày", "description": "Mô tả khác", "order": 2},
             headers=headers,
         )
         assert duplicate.status_code == 409
@@ -386,11 +395,11 @@ def test_hero_crud_flow_and_conflicts() -> None:
         item_id = created_payload["id"]
         updated = client.put(
             f"/api/v1/content/hero/{item_id}",
-            json={"title": "Tu van mien phi", "description": "Ho tro chat lieu", "order": 2},
+            json={"title": "Tư vấn miễn phí", "description": "Hỗ trợ chất liệu", "order": 2},
             headers=headers,
         )
         assert updated.status_code == 200
-        assert updated.json()["title"] == "Tu van mien phi"
+        assert updated.json()["title"] == "Tư vấn miễn phí"
 
         listed = client.get("/api/v1/content/hero", headers=headers)
         assert listed.status_code == 200
@@ -413,8 +422,8 @@ def test_products_content_crud_flow_and_category_validation() -> None:
     fake_db = FakeDB(
         {
             "categories": [
-                {"label": "ALBUM ANH", "slug": "album-anh", "img": "", "order": 1},
-                {"label": "KHUNG ANH", "slug": "khung-anh", "img": "", "order": 2},
+                {"label": "ALBUM ẢNH", "slug": "album-anh", "img": "", "order": 1},
+                {"label": "KHUNG ẢNH", "slug": "khung-anh", "img": "", "order": 2},
             ]
         }
     )
@@ -425,7 +434,7 @@ def test_products_content_crud_flow_and_category_validation() -> None:
         created = client.post(
             "/api/v1/content/products",
             json={
-                "name": "Album Da Cao Cap",
+                "name": "Album Da Cao Cấp",
                 "slug": "album-da-cao-cap",
                 "category_slug": "album-anh",
                 "price": 259000,
@@ -433,7 +442,7 @@ def test_products_content_crud_flow_and_category_validation() -> None:
                     "https://cdn.example.com/products/album-da-thumb.jpg",
                     "https://cdn.example.com/products/album-da-side.jpg",
                 ],
-                "short_description": "Album cao cap cho anh cuoi",
+                "short_description": "Album cao cấp cho ảnh cưới",
                 "order": 1,
                 "is_active": True,
             },
@@ -442,7 +451,7 @@ def test_products_content_crud_flow_and_category_validation() -> None:
         assert created.status_code == 201
         created_payload = created.json()
         assert created_payload["category_slug"] == "album-anh"
-        assert created_payload["name"] == "Album Da Cao Cap"
+        assert created_payload["name"] == "Album Da Cao Cấp"
         assert created_payload["sale_price"] is None
         assert created_payload["image_url"] == "https://cdn.example.com/products/album-da-thumb.jpg"
         assert created_payload["image_urls"][0] == "https://cdn.example.com/products/album-da-thumb.jpg"
@@ -450,7 +459,7 @@ def test_products_content_crud_flow_and_category_validation() -> None:
         invalid_category = client.post(
             "/api/v1/content/products",
             json={
-                "name": "San pham loi",
+                "name": "Sản phẩm lỗi",
                 "slug": "san-pham-loi",
                 "category_slug": "khong-ton-tai",
                 "price": 99000,
@@ -466,7 +475,7 @@ def test_products_content_crud_flow_and_category_validation() -> None:
         duplicate_slug = client.post(
             "/api/v1/content/products",
             json={
-                "name": "Album Da Cao Cap 2",
+                "name": "Album Da Cao Cấp 2",
                 "slug": "album-da-cao-cap",
                 "category_slug": "khung-anh",
                 "price": 289000,

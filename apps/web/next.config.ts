@@ -1,6 +1,154 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { NextConfig } from "next";
 
+const ROOT_ENV_PATH = path.resolve(process.cwd(), "..", "..", ".env");
+const PUBLIC_ENV_PREFIX = "NEXT_PUBLIC_";
+
+const loadRootPublicEnv = () => {
+  if (!fs.existsSync(ROOT_ENV_PATH)) return;
+  const contents = fs.readFileSync(ROOT_ENV_PATH, "utf8");
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex <= 0) continue;
+    const key = line.slice(0, separatorIndex).trim();
+    if (!key.startsWith(PUBLIC_ENV_PREFIX)) continue;
+    if (process.env[key]) continue;
+    let value = line.slice(separatorIndex + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+};
+
+loadRootPublicEnv();
+
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "host.docker.internal"]);
+
+const stripTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
+
+const deriveBackendUrl = (backendUrl: string, apiUrl: string): string => {
+  if (backendUrl) return stripTrailingSlashes(backendUrl);
+  if (!apiUrl) return "";
+  try {
+    const url = new URL(apiUrl);
+    url.pathname = url.pathname.replace(/\/api\/v1\/?$/i, "");
+    url.search = "";
+    url.hash = "";
+    return stripTrailingSlashes(url.toString());
+  } catch {
+    return "";
+  }
+};
+
+const isDev = process.env.NODE_ENV !== "production";
+const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL ?? "").trim();
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").trim();
+const minioEndpoint = (process.env.NEXT_PUBLIC_MINIO_ENDPOINT ?? process.env.MINIO_ENDPOINT ?? "").trim();
+const resolvedBackendUrl = deriveBackendUrl(backendUrl, apiUrl) || "http://localhost:8000";
+
+const isLocalUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return LOCAL_HOSTNAMES.has(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
+const disableImageOptimization = isDev && isLocalUrl(resolvedBackendUrl);
+
+type RemotePattern = {
+  protocol?: "http" | "https";
+  hostname: string;
+  port?: string;
+  pathname?: string;
+};
+
+const uniquePatterns = (patterns: RemotePattern[]): RemotePattern[] => {
+  const seen = new Set<string>();
+  return patterns.filter((pattern) => {
+    const key = `${pattern.protocol ?? ""}|${pattern.hostname ?? ""}|${pattern.port ?? ""}|${pattern.pathname ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const createPattern = (urlValue: string, pathname = "/**"): RemotePattern | null => {
+  try {
+    const url = new URL(urlValue);
+    const protocol = url.protocol.replace(":", "") as "http" | "https";
+    const pattern: RemotePattern = {
+      protocol,
+      hostname: url.hostname,
+      pathname,
+    };
+    if (url.port) pattern.port = url.port;
+    return pattern;
+  } catch {
+    return null;
+  }
+};
+
+const addLocalAliases = (urlValue: string, pathname = "/**"): RemotePattern[] => {
+  const patterns: RemotePattern[] = [];
+  try {
+    const url = new URL(urlValue);
+    if (!LOCAL_HOSTNAMES.has(url.hostname)) return patterns;
+    for (const hostname of LOCAL_HOSTNAMES) {
+      const aliasUrl = `${url.protocol}//${hostname}${url.port ? `:${url.port}` : ""}`;
+      const pattern = createPattern(aliasUrl, pathname);
+      if (pattern) patterns.push(pattern);
+    }
+  } catch {
+    return patterns;
+  }
+  return patterns;
+};
+
+const buildRemotePatterns = (): RemotePattern[] => {
+  const patterns: RemotePattern[] = [];
+
+  const backendPattern = createPattern(resolvedBackendUrl, "/uploads/**");
+  if (backendPattern) patterns.push(backendPattern);
+  patterns.push(...addLocalAliases(resolvedBackendUrl, "/uploads/**"));
+
+  if (apiUrl) {
+    const apiBackend = deriveBackendUrl("", apiUrl);
+    const apiPattern = apiBackend ? createPattern(apiBackend, "/uploads/**") : null;
+    if (apiPattern) patterns.push(apiPattern);
+    if (apiBackend) patterns.push(...addLocalAliases(apiBackend, "/uploads/**"));
+  }
+
+  if (minioEndpoint) {
+    const minioPattern = createPattern(minioEndpoint, "/**");
+    if (minioPattern) patterns.push(minioPattern);
+  }
+
+  patterns.push(
+    { protocol: "http", hostname: "localhost", port: "8000", pathname: "/uploads/**" },
+    { protocol: "http", hostname: "localhost", port: "9000", pathname: "/**" },
+    { protocol: "https", hostname: "inanh24h.com", pathname: "/**" },
+    { protocol: "https", hostname: "www.inanh24h.com", pathname: "/**" },
+    { protocol: "https", hostname: "api.inanh24h.com", pathname: "/uploads/**" }
+  );
+
+  return uniquePatterns(patterns);
+};
+
 const nextConfig: NextConfig = {
+  images: {
+    unoptimized: disableImageOptimization,
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: buildRemotePatterns(),
+  },
   async redirects() {
     return [
       // Force non-www

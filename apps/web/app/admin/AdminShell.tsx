@@ -5,14 +5,17 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "Tong quan" },
+  { href: "/admin", label: "Tổng quan" },
   { href: "/admin/pages", label: "Pages" },
   { href: "/admin/menu", label: "Menu" },
-  { href: "/admin/categories", label: "Danh muc" },
-  { href: "/admin/products", label: "San pham" },
+  { href: "/admin/categories", label: "Danh mục" },
+  { href: "/admin/products", label: "Sản phẩm" },
+  { href: "/admin/orders", label: "Đơn hàng" },
+  { href: "/admin/drafts", label: "Lưu nháp" },
+  { href: "/admin/users", label: "Users" },
   { href: "/admin/hero", label: "Hero" },
   { href: "/admin/banners", label: "Banner" },
-  { href: "/admin/settings", label: "Cai dat" },
+  { href: "/admin/settings", label: "Cài đặt" },
 ];
 
 type AdminShellProps = {
@@ -92,7 +95,7 @@ export default function AdminShell({ title, subtitle, onLogout, children, action
                   onClick={onLogout}
                   className="rounded-xl border border-stone-300 px-4 py-2 text-xs font-semibold text-stone-700"
                 >
-                  Dang xuat
+                  Đăng xuất
                 </button>
               </div>
             </div>

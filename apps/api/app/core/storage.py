@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+import shutil
+from typing import BinaryIO
 from urllib.parse import urlparse
 
 try:
@@ -88,6 +90,32 @@ def store_object_bytes(object_path: str, data: bytes, content_type: str) -> None
             object_path,
             payload,
             length=len(data),
+            content_type=content_type,
+        )
+    except Exception as exc:
+        raise StorageUnavailableError("Failed to upload object to MinIO.") from exc
+
+
+def store_object_stream(object_path: str, source: BinaryIO, size: int, content_type: str) -> None:
+    if size <= 0:
+        raise StorageUnavailableError("Invalid object size.")
+    try:
+        source.seek(0)
+    except Exception:
+        pass
+    if _is_local_backend():
+        destination = _resolve_local_path(object_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("wb") as handle:
+            shutil.copyfileobj(source, handle)
+        return
+    try:
+        client = _build_minio_client()
+        client.put_object(
+            settings.minio_bucket_name,
+            object_path,
+            source,
+            length=size,
             content_type=content_type,
         )
     except Exception as exc:

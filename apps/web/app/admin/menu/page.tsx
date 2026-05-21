@@ -40,7 +40,7 @@ export default function AdminMenuPage() {
     if (!token) return;
     listMenu(token)
       .then((data) => setItems(sortByOrder(data)))
-      .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc menu."))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được menu."))
       .finally(() => setLoaded(true));
   }, [token]);
 
@@ -79,21 +79,21 @@ export default function AdminMenuPage() {
         order: Math.max(0, form.order),
       };
       if (!payload.label.trim() || !payload.path.trim()) {
-        setError("Label va path la bat buoc.");
+        setError("Label và path là bắt buộc.");
         return;
       }
       if (editId) {
         const updated = await updateMenu(token, editId, payload);
         setItems((prev) => sortByOrder(prev.map((item) => (item.id === updated.id ? updated : item))));
-        setNotice("Da cap nhat menu.");
+        setNotice("Đã cập nhật menu.");
       } else {
         const created = await createMenu(token, payload);
         setItems((prev) => sortByOrder([...prev, created]));
-        setNotice("Da tao menu.");
+        setNotice("Đã tạo menu.");
       }
       resetModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc menu.");
+      setError(err instanceof Error ? err.message : "Không lưu được menu.");
     } finally {
       setSaving(false);
     }
@@ -111,10 +111,10 @@ export default function AdminMenuPage() {
     try {
       await deleteMenu(token, pendingDeleteId);
       setItems((prev) => prev.filter((item) => item.id !== pendingDeleteId));
-      setNotice("Da xoa menu.");
+      setNotice("Đã xóa menu.");
       setPendingDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong xoa duoc menu.");
+      setError(err instanceof Error ? err.message : "Không xóa được menu.");
     } finally {
       setDeleting(false);
     }
@@ -125,11 +125,11 @@ export default function AdminMenuPage() {
   return (
     <AdminShell
       title="Menu"
-      subtitle="Tat ca thao tac them/sua duoc thuc hien trong popup."
+      subtitle="Tất cả thao tác thêm/sửa được thực hiện trong popup."
       onLogout={logout}
       actions={
         <button type="button" onClick={handleOpenCreate} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-          Them menu
+          Thêm menu
         </button>
       }
     >
@@ -137,7 +137,7 @@ export default function AdminMenuPage() {
       {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</p>}
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} menu items` : "Dang tai..."}</p>
+        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} mục menu` : "Đang tải..."}</p>
         <div className="grid gap-3">
           {items.map((item) => (
             <article key={item.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
@@ -150,42 +150,42 @@ export default function AdminMenuPage() {
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => handleOpenEdit(item)} className="rounded-lg border border-stone-300 px-3 py-1 text-xs">
-                    Sua
+                    Sửa
                   </button>
                   <button
                     type="button"
                     onClick={() => requestDelete(item.id)}
                     className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600"
                   >
-                    Xoa
+                    Xóa
                   </button>
                 </div>
               </div>
             </article>
           ))}
-          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chua co menu nao.</p>}
+          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chưa có menu nào.</p>}
         </div>
       </section>
 
       <AdminModal
         open={modalOpen}
         onClose={resetModal}
-        title={editId ? "Sua menu" : "Them menu"}
-        description="Nhap ro label va duong dan."
+        title={editId ? "Sửa menu" : "Thêm menu"}
+        description="Nhập rõ label và đường dẫn."
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" onClick={resetModal} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-              Huy
+              Hủy
             </button>
             <button type="submit" form="menu-form" className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white" disabled={saving}>
-              {saving ? "Dang luu..." : "Luu"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         }
       >
         <form id="menu-form" className="space-y-3" onSubmit={handleSave}>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Label menu
+            Tên menu
             <input
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.label}
@@ -194,7 +194,7 @@ export default function AdminMenuPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Duong dan
+            Đường dẫn
             <input
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
               placeholder="/gioi-thieu"
@@ -204,7 +204,7 @@ export default function AdminMenuPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Thu tu hien thi
+            Thứ tự hiển thị
             <input
               type="number"
               min={0}
@@ -219,9 +219,9 @@ export default function AdminMenuPage() {
       <ConfirmActionModal
         open={Boolean(pendingDeleteId)}
         busy={deleting}
-        title="Xac nhan xoa menu"
-        description="Ban co chac chan muon xoa menu nay khong?"
-        confirmLabel="Xoa menu"
+        title="Xác nhận xóa menu"
+        description="Bạn có chắc chắn muốn xóa menu này không?"
+        confirmLabel="Xóa menu"
         onConfirm={() => void handleDelete()}
         onClose={() => setPendingDeleteId(null)}
       />

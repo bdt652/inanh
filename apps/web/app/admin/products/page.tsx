@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
 import AdminNeedLogin from "../AdminNeedLogin";
@@ -8,6 +9,7 @@ import ConfirmActionModal from "../ConfirmActionModal";
 import { createProduct, deleteProduct, listCategories, listProducts, updateProduct, uploadImage } from "../api";
 import type { CategoryRecord, ProductRecord, ProductUpsert } from "../types";
 import { useAdminToken } from "../useAdminToken";
+import { shouldSkipImageOptimization } from "../../lib/image";
 import ProductFormModal from "./ProductFormModal";
 
 const EMPTY_FORM: ProductUpsert = {
@@ -19,11 +21,13 @@ const EMPTY_FORM: ProductUpsert = {
   image_url: "",
   image_urls: [],
   short_description: "",
+  content: "",
   order: 0,
   is_active: true,
   is_featured: false,
   extra_options: [],
   allow_online_order: true,
+  pricing_mode: "retail",
   min_images: null,
   max_images: null,
 };
@@ -76,7 +80,7 @@ export default function AdminProductsPage() {
         setItems(sortByOrder(products));
         setCategories(categoryItems);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc du lieu san pham."))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được dữ liệu sản phẩm."))
       .finally(() => setLoaded(true));
   }, [token]);
 
@@ -108,11 +112,13 @@ export default function AdminProductsPage() {
       image_url: item.image_url,
       image_urls: item.image_urls,
       short_description: item.short_description,
+      content: item.content ?? "",
       order: item.order,
       is_active: item.is_active,
       is_featured: item.is_featured,
       extra_options: item.extra_options ?? [],
       allow_online_order: item.allow_online_order ?? true,
+      pricing_mode: item.pricing_mode ?? "retail",
       min_images: item.min_images ?? null,
       max_images: item.max_images ?? null,
     });
@@ -150,22 +156,22 @@ export default function AdminProductsPage() {
         max_images: form.max_images ?? null,
       };
       if (!payload.name.trim() || !payload.slug.trim() || !payload.category_slug.trim()) {
-        setError("Ten, slug va category_slug la bat buoc.");
+        setError("Tên, slug và category_slug là bắt buộc.");
         return;
       }
 
       if (editId) {
         const updated = await updateProduct(token, editId, payload);
         setItems((prev) => sortByOrder(prev.map((item) => (item.id === updated.id ? updated : item))));
-        setNotice("Da cap nhat san pham.");
+        setNotice("Đã cập nhật sản phẩm.");
       } else {
         const created = await createProduct(token, payload);
         setItems((prev) => sortByOrder([...prev, created]));
-        setNotice("Da tao san pham.");
+        setNotice("Đã tạo sản phẩm.");
       }
       resetModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc san pham.");
+      setError(err instanceof Error ? err.message : "Không lưu được sản phẩm.");
     } finally {
       setSaving(false);
     }
@@ -183,10 +189,10 @@ export default function AdminProductsPage() {
     try {
       await deleteProduct(token, pendingDeleteId);
       setItems((prev) => prev.filter((item) => item.id !== pendingDeleteId));
-      setNotice("Da xoa san pham.");
+      setNotice("Đã xóa sản phẩm.");
       setPendingDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong xoa duoc san pham.");
+      setError(err instanceof Error ? err.message : "Không xóa được sản phẩm.");
     } finally {
       setDeleting(false);
     }
@@ -200,7 +206,7 @@ export default function AdminProductsPage() {
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const uploaded = await uploadImage(token, file);
+        const uploaded = await uploadImage(token, file, "product");
         urls.push(uploaded.url);
       }
       const merged = [...previewImages, ...urls];
@@ -211,22 +217,30 @@ export default function AdminProductsPage() {
         image_url: merged[0] ?? "",
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong upload duoc hinh san pham.");
+      setError(err instanceof Error ? err.message : "Không upload được hình sản phẩm.");
     } finally {
       event.target.value = "";
     }
+  };
+
+  const handleUploadContentImage = async (file: File): Promise<string> => {
+    if (!token) {
+      throw new Error("Phiên đăng nhập đã hết hạn.");
+    }
+    const uploaded = await uploadImage(token, file, "content");
+    return uploaded.url;
   };
 
   if (!token) return <AdminNeedLogin />;
 
   return (
     <AdminShell
-      title="San pham"
-      subtitle="Popup form co label ro, upload va preview hinh anh day du."
+      title="Sản phẩm"
+      subtitle="Popup form có label rõ, upload và preview hình ảnh đầy đủ."
       onLogout={logout}
       actions={
         <button type="button" onClick={openCreate} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-          Them san pham
+          Thêm sản phẩm
         </button>
       }
     >
@@ -234,17 +248,24 @@ export default function AdminProductsPage() {
       {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</p>}
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} san pham` : "Dang tai..."}</p>
+        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} sản phẩm` : "Đang tải..."}</p>
         <div className="grid gap-3">
           {items.map((item) => (
             <article key={item.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-white">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-white relative">
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+                      <Image
+                        src={item.image_url}
+                        alt={item.name}
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                        unoptimized={shouldSkipImageOptimization(item.image_url)}
+                      />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-[10px] text-stone-400">No image</div>
+                      <div className="flex h-full items-center justify-center text-[10px] text-stone-400">Chưa có ảnh</div>
                     )}
                   </div>
                   <div className="min-w-0">
@@ -254,27 +275,27 @@ export default function AdminProductsPage() {
                     </p>
                     {item.allow_online_order === false && (
                       <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-700">
-                        Chi nhan Zalo
+                        Chỉ nhận Zalo
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => openEdit(item)} className="rounded-lg border border-stone-300 px-3 py-1 text-xs">
-                    Sua
+                    Sửa
                   </button>
                   <button
                     type="button"
                     onClick={() => requestDelete(item.id)}
                     className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600"
                   >
-                    Xoa
+                    Xóa
                   </button>
                 </div>
               </div>
             </article>
           ))}
-          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chua co san pham nao.</p>}
+          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chưa có sản phẩm nào.</p>}
         </div>
       </section>
 
@@ -288,6 +309,7 @@ export default function AdminProductsPage() {
         onClose={resetModal}
         onSubmit={handleSave}
         onUploadImages={handleUploadImages}
+        onUploadContentImage={handleUploadContentImage}
         onReorderImage={(fromIndex, toIndex) => {
           setImagesText((prevText) => {
             const list = toImageList(prevText);
@@ -311,9 +333,9 @@ export default function AdminProductsPage() {
       <ConfirmActionModal
         open={Boolean(pendingDeleteId)}
         busy={deleting}
-        title="Xac nhan xoa san pham"
-        description="Ban co chac chan muon xoa san pham nay khong?"
-        confirmLabel="Xoa san pham"
+        title="Xác nhận xóa sản phẩm"
+        description="Bạn có chắc chắn muốn xóa sản phẩm này không?"
+        confirmLabel="Xóa sản phẩm"
         onConfirm={() => void handleDelete()}
         onClose={() => setPendingDeleteId(null)}
       />

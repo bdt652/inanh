@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
 
 import AdminModal from "../AdminModal";
@@ -10,6 +11,7 @@ import ImageUploadField from "../ImageUploadField";
 import { createCategory, deleteCategory, listCategories, updateCategory, uploadImage } from "../api";
 import type { CategoryRecord, CategoryUpsert } from "../types";
 import { useAdminToken } from "../useAdminToken";
+import { shouldSkipImageOptimization } from "../../lib/image";
 
 const EMPTY_FORM: CategoryUpsert = { label: "", slug: "", img: "", order: 0 };
 
@@ -45,7 +47,7 @@ export default function AdminCategoriesPage() {
     if (!token) return;
     listCategories(token)
       .then((data) => setItems(sortByOrder(data)))
-      .catch((err) => setError(err instanceof Error ? err.message : "Khong tai duoc danh muc."))
+      .catch((err) => setError(err instanceof Error ? err.message : "Không tải được danh mục."))
       .finally(() => setLoaded(true));
   }, [token]);
 
@@ -84,21 +86,21 @@ export default function AdminCategoriesPage() {
         order: Math.max(0, form.order),
       };
       if (!payload.label.trim() || !payload.slug.trim()) {
-        setError("Label va slug la bat buoc.");
+        setError("Label và slug là bắt buộc.");
         return;
       }
       if (editId) {
         const updated = await updateCategory(token, editId, payload);
         setItems((prev) => sortByOrder(prev.map((item) => (item.id === updated.id ? updated : item))));
-        setNotice("Da cap nhat danh muc.");
+        setNotice("Đã cập nhật danh mục.");
       } else {
         const created = await createCategory(token, payload);
         setItems((prev) => sortByOrder([...prev, created]));
-        setNotice("Da tao danh muc.");
+        setNotice("Đã tạo danh mục.");
       }
       resetModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong luu duoc danh muc.");
+      setError(err instanceof Error ? err.message : "Không lưu được danh mục.");
     } finally {
       setSaving(false);
     }
@@ -116,10 +118,10 @@ export default function AdminCategoriesPage() {
     try {
       await deleteCategory(token, pendingDeleteId);
       setItems((prev) => prev.filter((item) => item.id !== pendingDeleteId));
-      setNotice("Da xoa danh muc.");
+      setNotice("Đã xóa danh mục.");
       setPendingDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Khong xoa duoc danh muc.");
+      setError(err instanceof Error ? err.message : "Không xóa được danh mục.");
     } finally {
       setDeleting(false);
     }
@@ -127,7 +129,7 @@ export default function AdminCategoriesPage() {
 
   const handleUpload = async (file: File) => {
     if (!token) return;
-    const uploaded = await uploadImage(token, file);
+    const uploaded = await uploadImage(token, file, "category");
     setForm((prev) => ({ ...prev, img: uploaded.url }));
   };
 
@@ -135,12 +137,12 @@ export default function AdminCategoriesPage() {
 
   return (
     <AdminShell
-      title="Danh muc"
-      subtitle="Dong bo giao dien voi popup va preview hinh."
+      title="Danh mục"
+      subtitle="Đồng bộ giao diện với popup và preview hình."
       onLogout={logout}
       actions={
         <button type="button" onClick={openCreate} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-          Them danh muc
+          Thêm danh mục
         </button>
       }
     >
@@ -148,16 +150,23 @@ export default function AdminCategoriesPage() {
       {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</p>}
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} danh muc` : "Dang tai..."}</p>
+        <p className="mb-3 text-sm text-stone-500">{loaded ? `${items.length} danh mục` : "Đang tải..."}</p>
         <div className="grid gap-3 md:grid-cols-2">
           {items.map((item) => (
             <article key={item.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
               <div className="flex gap-3">
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-white">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-white relative">
                   {item.img ? (
-                    <img src={item.img} alt={item.label} className="h-full w-full object-cover" />
+                    <Image
+                      src={item.img}
+                      alt={item.label}
+                      fill
+                      sizes="64px"
+                      className="object-cover"
+                      unoptimized={shouldSkipImageOptimization(item.img)}
+                    />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[10px] text-stone-400">No image</div>
+                    <div className="flex h-full items-center justify-center text-[10px] text-stone-400">Chưa có ảnh</div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -167,33 +176,33 @@ export default function AdminCategoriesPage() {
                   </p>
                   <div className="mt-2 flex gap-2">
                     <button type="button" onClick={() => openEdit(item)} className="rounded-lg border border-stone-300 px-3 py-1 text-xs">
-                      Sua
+                    Sửa
                     </button>
                     <button
                       type="button"
                       onClick={() => requestDelete(item.id)}
                       className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600"
                     >
-                      Xoa
+                    Xóa
                     </button>
                   </div>
                 </div>
               </div>
             </article>
           ))}
-          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chua co danh muc nao.</p>}
+          {loaded && items.length === 0 && <p className="text-sm text-stone-500">Chưa có danh mục nào.</p>}
         </div>
       </section>
 
       <AdminModal
         open={modalOpen}
         onClose={resetModal}
-        title={editId ? "Sua danh muc" : "Them danh muc"}
+        title={editId ? "Sửa danh mục" : "Thêm danh mục"}
         description="Moi truong upload va preview duoc dat label ro rang."
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" onClick={resetModal} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
@@ -201,14 +210,14 @@ export default function AdminCategoriesPage() {
               disabled={saving}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              {saving ? "Dang luu..." : "Luu"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </button>
           </div>
         }
       >
         <form id="category-form" className="space-y-3" onSubmit={handleSave}>
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Ten danh muc
+            Tên danh mục
             <input
               className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
               value={form.label}
@@ -230,22 +239,23 @@ export default function AdminCategoriesPage() {
                 onClick={() => setForm((prev) => ({ ...prev, slug: slugify(prev.label || prev.slug) }))}
                 className="rounded-xl border border-stone-300 px-3 py-2 text-xs"
               >
-                Tao slug
+                Tạo slug
               </button>
             </div>
           </label>
 
           <ImageUploadField
             id="category-image"
-            label="Hinh danh muc"
+            label="Hình danh mục"
             value={form.img}
             onChange={(value) => setForm((prev) => ({ ...prev, img: value }))}
             onUpload={handleUpload}
-            hint="Upload anh de xem preview ngay trong popup."
+            recommendedSize="1200x800"
+            hint="Tải ảnh để xem trước ngay trong popup."
           />
 
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
-            Thu tu hien thi
+            Thứ tự hiển thị
             <input
               type="number"
               min={0}
@@ -260,9 +270,9 @@ export default function AdminCategoriesPage() {
       <ConfirmActionModal
         open={Boolean(pendingDeleteId)}
         busy={deleting}
-        title="Xac nhan xoa danh muc"
-        description="Ban co chac chan muon xoa danh muc nay khong?"
-        confirmLabel="Xoa danh muc"
+        title="Xác nhận xóa danh mục"
+        description="Bạn có chắc chắn muốn xóa danh mục này không?"
+        confirmLabel="Xóa danh mục"
         onConfirm={() => void handleDelete()}
         onClose={() => setPendingDeleteId(null)}
       />

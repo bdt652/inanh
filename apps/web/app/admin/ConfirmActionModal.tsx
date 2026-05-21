@@ -33,7 +33,7 @@ export default function ConfirmActionModal({
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
-            Huy
+            Hủy
           </button>
           <button
             type="button"
@@ -43,7 +43,7 @@ export default function ConfirmActionModal({
               danger ? "bg-red-600" : "bg-stone-900"
             }`}
           >
-            {busy ? "Dang xu ly..." : confirmLabel}
+            {busy ? "Đang xử lý..." : confirmLabel}
           </button>
         </div>
       }

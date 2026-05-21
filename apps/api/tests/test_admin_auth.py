@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.db.mongo import get_db
 from app.main import app
 from tests.auth_helpers import ADMIN_PASSWORD, ADMIN_USERNAME, seed_admin
@@ -12,12 +13,16 @@ client = TestClient(app)
 def test_admin_bootstrap_success_for_first_admin() -> None:
     fake_db = FakeDB()
     app.dependency_overrides[get_db] = lambda: fake_db
+    original_secret = settings.admin_bootstrap_secret
+    settings.admin_bootstrap_secret = "bootstrap-secret"
     try:
         response = client.post(
             "/api/v1/admin/bootstrap",
             json={"username": ADMIN_USERNAME, "password": ADMIN_PASSWORD},
+            headers={"x-admin-bootstrap-secret": "bootstrap-secret"},
         )
     finally:
+        settings.admin_bootstrap_secret = original_secret
         app.dependency_overrides.pop(get_db, None)
     assert response.status_code == 200
     assert response.json() == {"username": ADMIN_USERNAME}
@@ -27,14 +32,35 @@ def test_admin_bootstrap_conflict_when_admin_exists() -> None:
     fake_db = FakeDB()
     seed_admin(fake_db)
     app.dependency_overrides[get_db] = lambda: fake_db
+    original_secret = settings.admin_bootstrap_secret
+    settings.admin_bootstrap_secret = "bootstrap-secret"
     try:
         response = client.post(
             "/api/v1/admin/bootstrap",
             json={"username": "admin2", "password": "admin12345"},
+            headers={"x-admin-bootstrap-secret": "bootstrap-secret"},
         )
     finally:
+        settings.admin_bootstrap_secret = original_secret
         app.dependency_overrides.pop(get_db, None)
     assert response.status_code == 409
+
+
+def test_admin_bootstrap_requires_secret() -> None:
+    fake_db = FakeDB()
+    app.dependency_overrides[get_db] = lambda: fake_db
+    original_secret = settings.admin_bootstrap_secret
+    settings.admin_bootstrap_secret = "bootstrap-secret"
+    try:
+        response = client.post(
+            "/api/v1/admin/bootstrap",
+            json={"username": "admin2", "password": "admin12345"},
+            headers={"x-admin-bootstrap-secret": "wrong-secret"},
+        )
+    finally:
+        settings.admin_bootstrap_secret = original_secret
+        app.dependency_overrides.pop(get_db, None)
+    assert response.status_code == 401
 
 
 def test_admin_login_success() -> None:

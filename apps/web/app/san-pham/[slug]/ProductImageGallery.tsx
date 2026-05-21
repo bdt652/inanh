@@ -1,6 +1,10 @@
-"use client";
+﻿"use client";
 
+/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../../lib/image";
 
 type ProductImageGalleryProps = {
   productName: string;
@@ -16,7 +20,10 @@ function clampZoom(value: number): number {
 }
 
 export default function ProductImageGallery({ productName, images }: ProductImageGalleryProps) {
-  const normalizedImages = useMemo(() => images.filter((item) => item.trim().length > 0), [images]);
+  const normalizedImages = useMemo(
+    () => images.map((item) => normalizeImageUrl(item)).filter((item) => item.trim().length > 0),
+    [images]
+  );
   const [activeImage, setActiveImage] = useState("");
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(MIN_ZOOM);
@@ -48,13 +55,17 @@ export default function ProductImageGallery({ productName, images }: ProductImag
             setZoomLevel(MIN_ZOOM);
             setIsZoomOpen(true);
           }}
-          className="group relative block w-full overflow-hidden rounded-none border border-[var(--line)] bg-white text-left"
+          className="group relative block h-[58vw] max-h-[760px] min-h-[320px] w-full overflow-hidden rounded-none border border-[var(--line)] bg-white text-left"
           aria-label="Phóng to ảnh sản phẩm"
         >
-          <img
+          <Image
             src={resolvedActiveImage}
             alt={productName}
-            className="h-[58vw] max-h-[760px] min-h-[320px] w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            fill
+            sizes="(min-width: 1280px) 720px, (min-width: 1024px) 60vw, 100vw"
+            className="object-cover transition duration-300 group-hover:scale-[1.03]"
+            priority={resolvedActiveImage === normalizedImages[0]}
+            unoptimized={shouldSkipImageOptimization(resolvedActiveImage)}
           />
           <span className="absolute bottom-3 right-3 rounded-none bg-black/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">
             Nhấn để phóng to

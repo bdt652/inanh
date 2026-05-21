@@ -2,6 +2,7 @@
 node_modules/
 apps/web/.next/
 apps/web/out/
+*.log
 pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
@@ -25,9 +26,13 @@ apps/api/tests/.tmp-upload-test/
 
 # Deploy artifacts
 deploy/*.tar
+deploy/data/
 
 # Cloudflare tunnel
 deploy/cloudflared/credentials.json
+
+# Claude
+.claude/settings.local.json
 
 # Editor/OS
 .idea/
@@ -35,3 +40,6 @@ deploy/cloudflared/credentials.json
 *.iml
 Thumbs.db
 .DS_Store
+
+# Test cache files
+pytest-cache-files-*/

@@ -1,6 +1,12 @@
 ﻿import type {
+  AdminDraftDetail,
+  AdminDraftSummary,
   AdminLoginResponse,
+  AdminOrderDetail,
+  AdminOrderSummary,
   AdminProfile,
+  AdminUserRecord,
+  AdminUserUpdate,
   BannerRecord,
   BannerUpsert,
   CategoryRecord,
@@ -22,7 +28,7 @@ import { resolveApiBase } from "../lib/api-base";
 const API_BASE = resolveApiBase();
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   token?: string;
   body?: unknown;
 };
@@ -78,6 +84,87 @@ export async function loginAdmin(username: string, password: string): Promise<Ad
 
 export async function getAdminMe(token: string): Promise<AdminProfile> {
   return request<AdminProfile>("/admin/me", { token });
+}
+
+export async function listAdminOrders(token: string): Promise<AdminOrderSummary[]> {
+  return request<AdminOrderSummary[]>("/admin/orders", { token });
+}
+
+export async function getAdminOrder(token: string, orderId: string): Promise<AdminOrderDetail> {
+  return request<AdminOrderDetail>(`/admin/orders/${orderId}`, { token });
+}
+
+export async function updateAdminOrder(
+  token: string,
+  orderId: string,
+  payload: { status?: string; note?: string }
+): Promise<AdminOrderDetail> {
+  return request<AdminOrderDetail>(`/admin/orders/${orderId}`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export async function downloadAdminOrderArchive(
+  token: string,
+  orderId: string
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(`${API_BASE}/admin/orders/${encodeURIComponent(orderId)}/download`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") || "";
+  let filename = `order-${orderId}.zip`;
+  const match = disposition.match(/filename\*?=(?:UTF-8''|\"?)([^\";]+)/i);
+  if (match && match[1]) {
+    try {
+      filename = decodeURIComponent(match[1]);
+    } catch {
+      filename = match[1];
+    }
+  }
+  return { blob, filename };
+}
+
+export async function listAdminDrafts(token: string): Promise<AdminDraftSummary[]> {
+  return request<AdminDraftSummary[]>("/admin/drafts", { token });
+}
+
+export async function getAdminDraft(token: string, userId: string): Promise<AdminDraftDetail> {
+  return request<AdminDraftDetail>(`/admin/drafts/${encodeURIComponent(userId)}`, { token });
+}
+
+export async function deleteAdminDraft(token: string, userId: string): Promise<void> {
+  await request<void>(`/admin/drafts/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function listAdminUsers(token: string): Promise<AdminUserRecord[]> {
+  return request<AdminUserRecord[]>("/admin/users", { token });
+}
+
+export async function updateAdminUser(
+  token: string,
+  phone: string,
+  payload: AdminUserUpdate
+): Promise<AdminUserRecord> {
+  return request<AdminUserRecord>(`/admin/users/${encodeURIComponent(phone)}`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
 }
 
 export async function listMenu(token: string): Promise<MenuRecord[]> {
@@ -242,13 +329,14 @@ export async function deleteBanner(token: string, id: string): Promise<void> {
   });
 }
 
-export async function uploadImage(token: string, file: File): Promise<UploadImageResponse> {
+export async function uploadImage(token: string, file: File, purpose?: string): Promise<UploadImageResponse> {
   const response = await fetch(`${API_BASE}/content/uploads/images`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": file.type || "application/octet-stream",
       "X-File-Name": file.name,
+      ...(purpose ? { "X-Image-Purpose": purpose } : {}),
     },
     body: file,
     cache: "no-store",

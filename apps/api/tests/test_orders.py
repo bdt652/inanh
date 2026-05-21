@@ -260,5 +260,84 @@ def test_orders_enforce_product_min_max() -> None:
             headers=auth_headers(token),
         )
         assert ok.status_code == 201
+
+        ok_with_copies = client.post(
+            "/api/v1/orders",
+            json={
+                "products": [
+                    {
+                        "name": "Limited",
+                        "quantity": 3,
+                        "images": ["1", "2"],
+                        "image_copies": [
+                            {"key": "1", "copies": 2},
+                            {"key": "2", "copies": 1},
+                        ],
+                        "options": [],
+                        "selected_product_slug": "limited",
+                    }
+                ]
+            },
+            headers=auth_headers(token),
+        )
+        assert ok_with_copies.status_code == 201
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_orders_combo_defaults_to_exact_limit() -> None:
+    fake_db = FakeDB(
+        collections={
+            "products": [
+                {
+                    "_id": "prod-6",
+                    "slug": "combo-only",
+                    "name": "Combo Only",
+                    "allow_online_order": True,
+                    "pricing_mode": "combo",
+                    "min_images": 3,
+                },
+            ],
+            "settings": [
+                {"_id": "main", "upload_min_files": 1, "upload_max_files": 100},
+            ],
+        }
+    )
+    token = seed_user(fake_db)
+    app.dependency_overrides[get_db] = lambda: fake_db
+    try:
+        too_many = client.post(
+            "/api/v1/orders",
+            json={
+                "products": [
+                    {
+                        "name": "Combo Only",
+                        "quantity": 4,
+                        "images": ["1", "2", "3", "4"],
+                        "options": [],
+                        "selected_product_slug": "combo-only",
+                    }
+                ]
+            },
+            headers=auth_headers(token),
+        )
+        assert too_many.status_code == 400
+
+        ok = client.post(
+            "/api/v1/orders",
+            json={
+                "products": [
+                    {
+                        "name": "Combo Only",
+                        "quantity": 3,
+                        "images": ["1", "2", "3"],
+                        "options": [],
+                        "selected_product_slug": "combo-only",
+                    }
+                ]
+            },
+            headers=auth_headers(token),
+        )
+        assert ok.status_code == 201
     finally:
         app.dependency_overrides.pop(get_db, None)

@@ -222,9 +222,6 @@ export default function PageContentEditor({ value, onChange, onUploadImage, plac
         .run();
     });
 
-  const setImageCaption = () =>
-    keepFocus(() => {});
-
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">

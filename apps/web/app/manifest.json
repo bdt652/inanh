@@ -1,0 +1,53 @@
+{
+  "name": "In Ảnh 24h - Dịch vụ in ảnh online uy tín",
+  "short_name": "InAnh24h",
+  "description": "Dịch vụ in ảnh online uy tín tại Hà Nội. In nhanh trong ngày, đúng màu, giá cạnh tranh.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "vi",
+  "categories": ["business", "photography", "shopping"],
+  "icons": [
+    {
+      "src": "/Inanh/logo_inanh24h.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Inanh/logo_inanh24h.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/Inanh/logo_inanh24h.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "Sản phẩm",
+      "short_name": "Sản phẩm",
+      "description": "Xem danh sách sản phẩm in ảnh",
+      "url": "/san-pham",
+      "icons": [{ "src": "/Inanh/logo_inanh24h.jpg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Liên hệ",
+      "short_name": "Liên hệ",
+      "description": "Liên hệ với chúng tôi",
+      "url": "/lien-he",
+      "icons": [{ "src": "/Inanh/logo_inanh24h.jpg", "sizes": "96x96" }]
+    }
+  ]
+}

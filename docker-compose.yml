@@ -1,12 +1,4 @@
 services:
-  mongo:
-    image: mongo:7
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-
   minio:
     image: minio/minio
     restart: unless-stopped
@@ -17,8 +9,17 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
+      # CORS configuration for direct browser uploads
+      MINIO_CORS_ALLOWEDORIGINS: ${MINIO_CORS_ALLOWEDORIGINS:-}
+      MINIO_CORS_ALLOWEDMETHODS: ${MINIO_CORS_ALLOWEDMETHODS:-GET,PUT,POST,HEAD}
+      MINIO_CORS_ALLOWEDHEADERS: ${MINIO_CORS_ALLOWEDHEADERS:-*}
+      MINIO_CORS_MAXAGESECONDS: ${MINIO_CORS_MAXAGESECONDS:-3000}
     volumes:
       - minio-data:/data
+    networks:
+      default:
+        aliases:
+          - media.inanh24h.com
 
   api:
     build:
@@ -27,7 +28,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      MONGODB_URI: ${MONGODB_URI}
       DB_NAME: ${DB_NAME:-inanh24h}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
@@ -38,7 +39,6 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - mongo
       - minio
     volumes:
       - api-uploads:/app/app/uploads
@@ -51,6 +51,8 @@ services:
         NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://inanh24h.com}
+        NEXT_PUBLIC_UPLOAD_MODE: ${NEXT_PUBLIC_UPLOAD_MODE:-direct}
+        NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL: ${NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL:-}
         API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000/api/v1}
     restart: unless-stopped
     env_file: .env
@@ -58,6 +60,8 @@ services:
       NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://inanh24h.com}
+      NEXT_PUBLIC_UPLOAD_MODE: ${NEXT_PUBLIC_UPLOAD_MODE:-direct}
+      NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL: ${NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL:-}
       API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000/api/v1}
     ports:
       - "3000:3000"
@@ -65,6 +69,5 @@ services:
       - api
 
 volumes:
-  mongo-data:
   minio-data:
   api-uploads:
