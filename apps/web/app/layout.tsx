@@ -1,7 +1,10 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
+import LayoutTransition from "./components/motion/LayoutTransition";
 import { ToastProvider } from "./components/ToastProvider";
+import { buildLocalBusinessJsonLd, SITE_NAME, SITE_URL } from "./lib/seo";
+import { getSiteSettings } from "./lib/api";
 
 function resolveMetadataBase(): URL {
   const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://inanh24h.com";
@@ -15,8 +18,8 @@ function resolveMetadataBase(): URL {
 export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
   title: {
-    default: "In ảnh 24h",
-    template: "%s | In ảnh 24h",
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
   },
   description: "In ảnh online 24h, in nhanh đúng màu, bảng giá minh bạch và danh mục sản phẩm đa dạng.",
   keywords: [
@@ -39,9 +42,9 @@ export const metadata: Metadata = {
     "cửa hàng in ảnh",
     "in ảnh Hà Nội",
   ].join(", "),
-  authors: [{ name: "In ảnh 24h" }],
-  creator: "In ảnh 24h",
-  publisher: "In ảnh 24h",
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   robots: {
     index: true,
     follow: true,
@@ -53,29 +56,20 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  alternates: {
-    canonical: resolveMetadataBase().toString(),
-    languages: {
-      "vi-VN": resolveMetadataBase().toString(),
-      "en-US": `${resolveMetadataBase().toString()}/en`,
-    },
-  },
   verification: {
     google: "google286cec79b1ba2250",
-    yandex: "yandex-verification-code",
   },
   openGraph: {
     type: "website",
     locale: "vi_VN",
-    alternateLocale: "en_US",
-    siteName: "In ảnh 24h",
-    title: "In ảnh 24h - In nhanh, đúng màu",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} - In nhanh, đúng màu`,
     description: "In ảnh online 24h, in nhanh đúng màu, bảng giá minh bạch và danh mục sản phẩm đa dạng.",
-    url: resolveMetadataBase().toString(),
+    url: SITE_URL,
     images: [
       {
         url: "/Inanh/logo_inanh24h.jpg",
-        alt: "In ảnh 24h",
+        alt: SITE_NAME,
         width: 1200,
         height: 630,
         type: "image/jpeg",
@@ -84,18 +78,15 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "In ảnh 24h - In nhanh, đúng màu",
+    title: `${SITE_NAME} - In nhanh, đúng màu`,
     description: "In ảnh online 24h, in nhanh đúng màu, bảng giá minh bạch và danh mục sản phẩm đa dạng.",
     images: ["/Inanh/logo_inanh24h.jpg"],
     creator: "@inanh24h",
     site: "@inanh24h",
   },
-  facebook: {
-    appId: "1234567890",
-  },
   appleWebApp: {
     capable: true,
-    title: "In Ảnh 24h",
+    title: SITE_NAME,
     statusBarStyle: "default",
   },
   manifest: "/manifest.json",
@@ -110,100 +101,46 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+function extractInlineScript(html: string): string {
+  const match = /<script[^>]*>([\s\S]*?)<\/script>/i.exec(html);
+  return match ? match[1].trim() : html.trim();
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const siteUrl = resolveMetadataBase().toString().replace(/\/+$/, "");
-  const analyticsJsonLd = {
+  const settings = await getSiteSettings().catch(() => null);
+  const googleHeader = settings?.google_header?.trim() ?? "";
+  const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "In ảnh 24h",
-    url: siteUrl,
+    name: SITE_NAME,
+    url: SITE_URL,
   };
   const serviceJsonLd = {
     "@context": "https://schema.org",
     "@type": "Service",
-    name: "Dịch vụ in ảnh 24h",
+    name: `Dịch vụ in ảnh 24h`,
     provider: {
       "@type": "Organization",
-      name: "In ảnh 24h",
-      url: siteUrl,
-      logo: `${siteUrl}/Inanh/logo_inanh24h.jpg`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      logo: `${SITE_URL}/Inanh/logo_inanh24h.jpg`,
     },
     areaServed: {
       "@type": "AdministrativeArea",
       name: "Hà Nội, Việt Nam",
     },
-    url: siteUrl,
+    url: SITE_URL,
     serviceType: "In ảnh lấy ngay, in ảnh gỗ, album ảnh",
     availableChannel: {
       "@type": "ServiceChannel",
-      serviceUrl: `${siteUrl}/lien-he`,
+      serviceUrl: `${SITE_URL}/lien-he`,
       availableLanguage: ["vi-VN"],
       name: "Đặt in trực tuyến",
     },
-  };
-  const orgJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    "@id": `${siteUrl}/#organization`,
-    name: "In ảnh 24h",
-    url: siteUrl,
-    logo: {
-      "@type": "ImageObject",
-      url: `${siteUrl}/Inanh/logo_inanh24h.jpg`,
-      width: 200,
-      height: 200,
-    },
-    image: `${siteUrl}/Inanh/logo_inanh24h.jpg`,
-    email: "Inanhonline24h@gmail.com",
-    telephone: "+84877226644",
-    priceRange: "₫₫",
-    currenciesAccepted: "VND",
-    paymentAccepted: "Cash, Credit Card, Bank Transfer",
-    openingHoursSpecification: [
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-        opens: "08:00",
-        closes: "20:00",
-      },
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: "Sunday",
-        opens: "09:00",
-        closes: "18:00",
-      },
-    ],
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: "85 Phố Gạch, TT Phúc Thọ",
-      addressLocality: "Phúc Thọ",
-      addressRegion: "Hà Nội",
-      postalCode: "100000",
-      addressCountry: "VN",
-    },
-    geo: {
-      "@type": "GeoCoordinates",
-      latitude: "21.0285",
-      longitude: "105.8542",
-    },
-    hasMap: "https://maps.google.com/?q=85+Phố+Gạch+Phúc+Thọ+Hà+Nội",
-    sameAs: [
-      "https://www.facebook.com/inanh24h",
-      "https://zalo.me/0877226644",
-    ],
-    contactPoint: [
-      {
-        "@type": "ContactPoint",
-        telephone: "+84877226644",
-        contactType: "customer service",
-        areaServed: "VN",
-        availableLanguage: "Vietnamese",
-      },
-    ],
   };
 
   return (
@@ -218,9 +155,18 @@ gtag('config', 'G-7QR8VEN14X');`}
         </Script>
       </head>
       <body className="antialiased">
-        <ToastProvider>{children}</ToastProvider>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(analyticsJsonLd) }} />
+        {googleHeader && (
+          <Script
+            id="custom-google-header"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{ __html: extractInlineScript(googleHeader) }}
+          />
+        )}
+        <ToastProvider>
+          <LayoutTransition>{children}</LayoutTransition>
+        </ToastProvider>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(buildLocalBusinessJsonLd()) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
       </body>
     </html>

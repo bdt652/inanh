@@ -30,6 +30,10 @@ const EMPTY_FORM: ProductUpsert = {
   pricing_mode: "retail",
   min_images: null,
   max_images: null,
+  tags: [],
+  seo_title: "",
+  seo_description: "",
+  focus_keyword: "",
 };
 
 function sortByOrder(items: ProductRecord[]): ProductRecord[] {
@@ -121,6 +125,10 @@ export default function AdminProductsPage() {
       pricing_mode: item.pricing_mode ?? "retail",
       min_images: item.min_images ?? null,
       max_images: item.max_images ?? null,
+      tags: item.tags ?? [],
+      seo_title: item.seo_title ?? "",
+      seo_description: item.seo_description ?? "",
+      focus_keyword: item.focus_keyword ?? "",
     });
     setImagesText(toImageText(item.image_urls));
     setEditId(item.id);

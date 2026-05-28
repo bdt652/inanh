@@ -3,20 +3,32 @@ import Link from "next/link";
 import AmbientGlow from "../components/AmbientGlow";
 import FooterSection from "../components/FooterSection";
 import HeaderBar from "../components/HeaderBar";
+import { PageTransition, ScrollReveal } from "../components/motion";
 import ScrollProgress from "../components/ScrollProgress";
 import { getCategories, getMenuItems, getSiteSettings } from "../lib/api";
+import { buildBreadcrumbJsonLd, SITE_URL } from "../lib/seo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Câu hỏi thường gặp",
+  title: "Câu hỏi thường gặp | In ảnh 24h",
   description: "Câu hỏi thường gặp về dịch vụ in ảnh - Giải đáp mọi thắc mắc về in ảnh: giá cả, kích thước, chất liệu, thời gian in, giao hàng...",
   keywords: "faq in ảnh, câu hỏi in ảnh, hướng dẫn in ảnh, hỏi đáp in ảnh",
+  alternates: {
+    canonical: `${SITE_URL}/faq`,
+  },
   openGraph: {
     title: "Câu hỏi thường gặp - In ảnh 24h",
     description: "Câu hỏi thường gặp về dịch vụ in ảnh - Giải đáp mọi thắc mắc về in ảnh",
-    url: "/faq",
+    url: `${SITE_URL}/faq`,
     type: "website",
+    locale: "vi_VN",
+    siteName: "In ảnh 24h",
+  },
+  twitter: {
+    card: "summary",
+    title: "Câu hỏi thường gặp - In ảnh 24h",
+    description: "Câu hỏi thường gặp về dịch vụ in ảnh - Giải đáp mọi thắc mắc về in ảnh",
   },
   robots: {
     index: true,
@@ -82,8 +94,14 @@ export default async function FAQPage() {
     safe(getSiteSettings, null),
   ]);
 
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Trang chủ", url: SITE_URL },
+    { name: "Câu hỏi thường gặp", url: `${SITE_URL}/faq` },
+  ]);
+
   return (
     <div className="relative min-h-screen">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <AmbientGlow />
       <HeaderBar menuItems={menuItems} logoUrl={siteSettings?.logo_url} />
       <ScrollProgress />
@@ -109,12 +127,15 @@ export default async function FAQPage() {
           }}
         />
 
+        <ScrollReveal variant="bounceIn">
         <h1 className="text-3xl font-bold mb-8 text-center">Câu hỏi thường gặp</h1>
+        </ScrollReveal>
 
+        <PageTransition>
         <div className="max-w-3xl mx-auto space-y-4">
           {faqItems.map((item, index) => (
+            <ScrollReveal key={index} variant="fadeUp" delay={index * 0.08}>
             <details
-              key={index}
               className="group bg-white rounded-lg shadow-md overflow-hidden"
             >
               <summary className="flex items-center justify-between p-6 cursor-pointer list-none">
@@ -142,9 +163,11 @@ export default async function FAQPage() {
                 {item.answer}
               </div>
             </details>
+            </ScrollReveal>
           ))}
         </div>
 
+        <ScrollReveal variant="zoomIn" delay={0.5}>
         <div className="mt-12 text-center">
           <p className="text-gray-600 mb-4">Không tìm thấy câu trả lời bạn cần?</p>
           <Link
@@ -154,6 +177,8 @@ export default async function FAQPage() {
             Liên hệ ngay
           </Link>
         </div>
+        </ScrollReveal>
+        </PageTransition>
       </main>
       <FooterSection categories={categories} settings={siteSettings} />
     </div>

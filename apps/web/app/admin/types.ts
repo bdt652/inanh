@@ -126,6 +126,10 @@ export type ProductRecord = {
   pricing_mode?: "combo" | "retail";
   min_images?: number | null;
   max_images?: number | null;
+  tags?: string[];
+  seo_title?: string;
+  seo_description?: string;
+  focus_keyword?: string;
 };
 
 export type PageRecord = {
@@ -160,6 +164,8 @@ export type SettingsRecord = {
   upload_max_files?: number | null;
   upload_max_bytes?: number | null;
   upload_require_verified_phone_threshold?: number | null;
+  login_phone_enabled?: boolean;
+  login_google_enabled?: boolean;
 };
 
 export type MenuUpsert = {
@@ -199,6 +205,10 @@ export type ProductUpsert = {
   pricing_mode: "combo" | "retail";
   min_images?: number | null;
   max_images?: number | null;
+  tags: string[];
+  seo_title: string;
+  seo_description: string;
+  focus_keyword: string;
 };
 
 export type PageUpsert = {
@@ -230,4 +240,36 @@ export type SettingsUpsert = {
   upload_max_files?: number | null;
   upload_max_bytes?: number | null;
   upload_require_verified_phone_threshold?: number | null;
+  login_phone_enabled?: boolean;
+  login_google_enabled?: boolean;
+};
+
+export type PostUpsert = {
+  slug: string;
+  title: string;
+  summary: string;
+  content: string;
+  cover_image: string | null;
+  is_published: boolean;
+  tags: string[];
+  order: number;
+  seo_title: string;
+  seo_description: string;
+  focus_keyword: string;
+};
+
+export type PostRecord = PostUpsert & {
+  id: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ReviewRecord = {
+  id: string;
+  product_slug: string;
+  rating: number;
+  body: string;
+  reviewer_name: string;
+  is_approved: boolean;
+  created_at: string | null;
 };

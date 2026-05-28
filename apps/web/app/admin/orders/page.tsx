@@ -72,7 +72,7 @@ const triggerBlobDownload = (blob: Blob, filename: string) => {
 
 export default function AdminOrdersPage() {
   const { token, logout } = useAdminToken();
-  const uploadsBase = useMemo(() => resolveUploadsBase(), []);
+  const uploadsBase = useMemo(() => resolveFileBase(), []);
   const [orders, setOrders] = useState<AdminOrderSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminOrderDetail | null>(null);

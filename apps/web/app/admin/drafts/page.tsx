@@ -53,7 +53,7 @@ const downloadFromUrl = async (url: string, filename: string): Promise<void> => 
 
 export default function AdminDraftsPage() {
   const { token, logout } = useAdminToken();
-  const uploadsBase = useMemo(() => resolveUploadsBase(), []);
+  const uploadsBase = useMemo(() => resolveFileBase(), []);
   const [drafts, setDrafts] = useState<AdminDraftSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminDraftDetail | null>(null);

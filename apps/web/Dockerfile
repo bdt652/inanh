@@ -1,10 +1,10 @@
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN corepack enable
 WORKDIR /app
-COPY apps/web/package.json apps/web/pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/pnpm-lock.yaml apps/web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 RUN corepack enable
 WORKDIR /app
 ENV NODE_ENV=production \
@@ -25,7 +25,7 @@ ENV NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL} \
     API_INTERNAL_URL=${API_INTERNAL_URL}
 RUN pnpm run build
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 RUN addgroup -S nextjs && adduser -S -G nextjs nextjs
 WORKDIR /app
 ENV NODE_ENV=production \

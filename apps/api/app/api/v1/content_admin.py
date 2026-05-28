@@ -1,8 +1,11 @@
 import asyncio
 import io
+import os
 import tempfile
+from datetime import UTC, datetime
 from uuid import uuid4
 
+import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -23,17 +26,44 @@ from app.api.v1.schemas import (
     HeroStatementUpsert,
     MenuItemRecord,
     MenuItemUpsert,
+    PostRecord,
+    PostUpsert,
     ProductRecord,
     ProductUpsert,
+    ReviewRecord,
+    ReviewSubmit,
     SiteSettingRecord,
     SiteSettingUpsert,
     UploadImageResponse,
 )
 from app.core.storage import StorageUnavailableError, store_object_bytes, store_object_stream
-from app.core.uploads import UPLOADS_ROUTE_PREFIX, build_public_upload_url
+from app.core.uploads import build_public_upload_url
 from app.db.mongo import ensure_indexes, get_db
 
 router = APIRouter(tags=["content"], dependencies=[Depends(require_admin)])
+
+
+async def _trigger_revalidate(paths: list[str]) -> None:
+    """Fire-and-forget ISR revalidation calls to the frontend. Best-effort: never raises."""
+    frontend_url = os.getenv("FRONTEND_INTERNAL_URL", "http://web:3000")
+    secret = os.getenv("REVALIDATE_SECRET", "")
+    if not secret:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            for path in paths:
+                try:
+                    await client.post(
+                        f"{frontend_url}/api/revalidate",
+                        json={"path": path},
+                        headers={"x-revalidate-secret": secret},
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 ALLOWED_IMAGE_CONTENT_TYPES = {
     "image/avif",
     "image/gif",
@@ -152,6 +182,8 @@ def _serialize_site_setting(doc: dict) -> SiteSettingRecord:
         upload_require_verified_phone_threshold=int(doc.get("upload_require_verified_phone_threshold"))
         if doc.get("upload_require_verified_phone_threshold") is not None
         else None,
+        login_phone_enabled=bool(doc.get("login_phone_enabled", True)),
+        login_google_enabled=bool(doc.get("login_google_enabled", True)),
     )
 
 
@@ -209,6 +241,10 @@ def _serialize_product(doc: dict) -> ProductRecord:
         pricing_mode=_resolve_pricing_mode(doc),
         min_images=_resolve_optional_int(doc, "min_images"),
         max_images=_resolve_optional_int(doc, "max_images"),
+        tags=[str(t) for t in doc.get("tags", [])],
+        seo_title=str(doc.get("seo_title", "")),
+        seo_description=str(doc.get("seo_description", "")),
+        focus_keyword=str(doc.get("focus_keyword", "")),
     )
 
 
@@ -418,8 +454,7 @@ async def upload_content_image(request: Request) -> UploadImageResponse:
     finally:
         spool.close()
 
-    public_path = f"{UPLOADS_ROUTE_PREFIX}/{object_path}"
-    return UploadImageResponse(url=build_public_upload_url(request, public_path))
+    return UploadImageResponse(url=build_public_upload_url(request, object_path))
 
 
 @router.get("/content/settings", response_model=SiteSettingRecord, summary="Get site settings from MongoDB")
@@ -443,6 +478,7 @@ async def upsert_site_settings_content(
     saved = await db["settings"].find_one({"_id": "main"})
     if saved is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load site settings.")
+    asyncio.create_task(_trigger_revalidate(["/"]))
     return _serialize_site_setting(saved)
 
 
@@ -574,6 +610,7 @@ async def create_category_content(payload: CategoryUpsert, db: AsyncIOMotorDatab
     created = await db["categories"].find_one({"_id": result.inserted_id})
     if created is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load created category.")
+    asyncio.create_task(_trigger_revalidate(["/", "/san-pham"]))
     return _serialize_category(created)
 
 
@@ -594,6 +631,7 @@ async def update_category_content(
     updated = await db["categories"].find_one({"_id": object_id})
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found.")
+    asyncio.create_task(_trigger_revalidate(["/", "/san-pham", f"/{payload.slug}"]))
     return _serialize_category(updated)
 
 
@@ -603,6 +641,7 @@ async def delete_category_content(item_id: str, db: AsyncIOMotorDatabase = Depen
     result = await db["categories"].delete_one({"_id": object_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found.")
+    asyncio.create_task(_trigger_revalidate(["/", "/san-pham"]))
     return DeleteResult(deleted=True, id=item_id)
 
 
@@ -633,6 +672,7 @@ async def create_product_content(payload: ProductUpsert, db: AsyncIOMotorDatabas
     created = await db["products"].find_one({"_id": result.inserted_id})
     if created is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load created product.")
+    asyncio.create_task(_trigger_revalidate(["/", "/san-pham", f"/san-pham/{payload.slug}"]))
     return _serialize_product(created)
 
 
@@ -654,6 +694,7 @@ async def update_product_content(
     updated = await db["products"].find_one({"_id": object_id})
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+    asyncio.create_task(_trigger_revalidate(["/", "/san-pham", f"/san-pham/{payload.slug}"]))
     return _serialize_product(updated)
 
 
@@ -663,6 +704,7 @@ async def delete_product_content(item_id: str, db: AsyncIOMotorDatabase = Depend
     result = await db["products"].delete_one({"_id": object_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+    asyncio.create_task(_trigger_revalidate(["/", "/san-pham"]))
     return DeleteResult(deleted=True, id=item_id)
 
 
@@ -725,4 +767,160 @@ async def delete_hero_content(item_id: str, db: AsyncIOMotorDatabase = Depends(g
     result = await db["hero_statements"].delete_one({"_id": object_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hero statement not found.")
+    return DeleteResult(deleted=True, id=item_id)
+
+
+# ── Posts (Hướng dẫn / Blog) ─────────────────────────────────────────────────
+
+def _serialize_post(doc: dict) -> PostRecord:
+    return PostRecord(
+        id=str(doc["_id"]),
+        slug=str(doc.get("slug", "")),
+        title=str(doc.get("title", "")),
+        summary=str(doc.get("summary", "")),
+        content=str(doc.get("content", "")),
+        cover_image=str(doc["cover_image"]) if doc.get("cover_image") else None,
+        is_published=bool(doc.get("is_published", False)),
+        tags=[str(t) for t in doc.get("tags", [])],
+        order=int(doc.get("order", 0)),
+        created_at=doc.get("created_at"),
+        updated_at=doc.get("updated_at"),
+        seo_title=str(doc.get("seo_title", "")),
+        seo_description=str(doc.get("seo_description", "")),
+        focus_keyword=str(doc.get("focus_keyword", "")),
+    )
+
+
+@router.get("/content/posts", response_model=list[PostRecord], summary="List all posts (admin)")
+async def list_posts_content(db: AsyncIOMotorDatabase = Depends(get_db)) -> list[PostRecord]:
+    docs = await db["posts"].find({}).sort("order", 1).to_list(length=500)
+    return [_serialize_post(doc) for doc in docs if doc.get("_id") and doc.get("slug")]
+
+
+@router.post("/content/posts", response_model=PostRecord, status_code=status.HTTP_201_CREATED, summary="Create post")
+async def create_post_content(payload: PostUpsert, db: AsyncIOMotorDatabase = Depends(get_db)) -> PostRecord:
+    await ensure_indexes(db)
+    now = datetime.now(UTC)
+    doc = {**payload.model_dump(), "created_at": now, "updated_at": now}
+    try:
+        result = await db["posts"].insert_one(doc)
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Post slug already exists.") from exc
+    created = await db["posts"].find_one({"_id": result.inserted_id})
+    if created is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load created post.")
+    asyncio.create_task(_trigger_revalidate(["/tin-tuc"]))
+    return _serialize_post(created)
+
+
+@router.put("/content/posts/{item_id}", response_model=PostRecord, summary="Update post")
+async def update_post_content(
+    item_id: str, payload: PostUpsert, db: AsyncIOMotorDatabase = Depends(get_db)
+) -> PostRecord:
+    object_id = _parse_object_id(item_id)
+    await ensure_indexes(db)
+    update_data = {**payload.model_dump(), "updated_at": datetime.now(UTC)}
+    try:
+        result = await db["posts"].update_one({"_id": object_id}, {"$set": update_data})
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Post slug already exists.") from exc
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+    updated = await db["posts"].find_one({"_id": object_id})
+    if updated is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+    asyncio.create_task(_trigger_revalidate(["/tin-tuc", f"/tin-tuc/{payload.slug}"]))
+    return _serialize_post(updated)
+
+
+@router.delete("/content/posts/{item_id}", response_model=DeleteResult, summary="Delete post")
+async def delete_post_content(item_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> DeleteResult:
+    object_id = _parse_object_id(item_id)
+    result = await db["posts"].delete_one({"_id": object_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+    asyncio.create_task(_trigger_revalidate(["/tin-tuc"]))
+    return DeleteResult(deleted=True, id=item_id)
+
+
+# ── Product Reviews ───────────────────────────────────────────────────────────
+
+def _serialize_review(doc: dict) -> ReviewRecord:
+    return ReviewRecord(
+        id=str(doc["_id"]),
+        product_slug=str(doc.get("product_slug", "")),
+        rating=int(doc.get("rating", 1)),
+        body=str(doc.get("body", "")),
+        reviewer_name=str(doc.get("reviewer_name", "")),
+        is_approved=bool(doc.get("is_approved", False)),
+        created_at=doc.get("created_at"),
+    )
+
+
+@router.post(
+    "/content/reviews",
+    response_model=ReviewRecord,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a review (admin, auto-approved)",
+)
+async def create_review_content(
+    payload: ReviewSubmit,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> ReviewRecord:
+    product = await db["products"].find_one({"slug": payload.product_slug, "is_active": {"$ne": False}})
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+    doc = {**payload.model_dump(), "is_approved": True, "created_at": datetime.now(UTC)}
+    result = await db["product_reviews"].insert_one(doc)
+    created = await db["product_reviews"].find_one({"_id": result.inserted_id})
+    if created is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save review.")
+    asyncio.create_task(_trigger_revalidate([f"/san-pham/{payload.product_slug}"]))
+    return _serialize_review(created)
+
+
+@router.get("/content/reviews", response_model=list[ReviewRecord], summary="List reviews (admin)")
+async def list_reviews_content(
+    product_slug: str | None = None,
+    is_approved: bool | None = None,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> list[ReviewRecord]:
+    query: dict = {}
+    if product_slug:
+        query["product_slug"] = product_slug
+    if is_approved is not None:
+        query["is_approved"] = is_approved
+    docs = await db["product_reviews"].find(query).sort("created_at", -1).to_list(length=500)
+    return [_serialize_review(doc) for doc in docs]
+
+
+@router.patch("/content/reviews/{item_id}/approve", response_model=ReviewRecord, summary="Approve or reject review")
+async def approve_review_content(
+    item_id: str,
+    approved: bool = True,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> ReviewRecord:
+    object_id = _parse_object_id(item_id)
+    result = await db["product_reviews"].update_one({"_id": object_id}, {"$set": {"is_approved": approved}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found.")
+    updated = await db["product_reviews"].find_one({"_id": object_id})
+    if updated is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found.")
+    product_slug = str(updated.get("product_slug", ""))
+    if product_slug:
+        asyncio.create_task(_trigger_revalidate([f"/san-pham/{product_slug}"]))
+    return _serialize_review(updated)
+
+
+@router.delete("/content/reviews/{item_id}", response_model=DeleteResult, summary="Delete review")
+async def delete_review_content(item_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> DeleteResult:
+    object_id = _parse_object_id(item_id)
+    doc = await db["product_reviews"].find_one({"_id": object_id})
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found.")
+    await db["product_reviews"].delete_one({"_id": object_id})
+    product_slug = str(doc.get("product_slug", ""))
+    if product_slug:
+        asyncio.create_task(_trigger_revalidate([f"/san-pham/{product_slug}"]))
     return DeleteResult(deleted=True, id=item_id)

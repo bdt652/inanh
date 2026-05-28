@@ -17,8 +17,11 @@
   MenuUpsert,
   PageRecord,
   PageUpsert,
+  PostRecord,
+  PostUpsert,
   ProductRecord,
   ProductUpsert,
+  ReviewRecord,
   SettingsRecord,
   SettingsUpsert,
 } from "./types";
@@ -375,4 +378,57 @@ export async function upsertSettings(token: string, payload: SettingsUpsert): Pr
     token,
     body: payload,
   });
+}
+
+// ── Posts ────────────────────────────────────────────────────────────────────
+
+export async function listPosts(token: string): Promise<PostRecord[]> {
+  return request<PostRecord[]>("/content/posts", { token });
+}
+
+export async function createPost(token: string, payload: PostUpsert): Promise<PostRecord> {
+  return request<PostRecord>("/content/posts", { method: "POST", token, body: payload });
+}
+
+export async function updatePost(token: string, id: string, payload: PostUpsert): Promise<PostRecord> {
+  return request<PostRecord>(`/content/posts/${id}`, { method: "PUT", token, body: payload });
+}
+
+export async function deletePost(token: string, id: string): Promise<void> {
+  await request<void>(`/content/posts/${id}`, { method: "DELETE", token });
+}
+
+// ── Reviews ──────────────────────────────────────────────────────────────────
+
+export async function createReview(
+  token: string,
+  payload: { product_slug: string; rating: number; body: string; reviewer_name: string }
+): Promise<ReviewRecord> {
+  return request<ReviewRecord>("/content/reviews", {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listReviews(
+  token: string,
+  opts?: { product_slug?: string; is_approved?: boolean }
+): Promise<ReviewRecord[]> {
+  const params = new URLSearchParams();
+  if (opts?.product_slug) params.set("product_slug", opts.product_slug);
+  if (opts?.is_approved !== undefined) params.set("is_approved", String(opts.is_approved));
+  const qs = params.toString();
+  return request<ReviewRecord[]>(`/content/reviews${qs ? `?${qs}` : ""}`, { token });
+}
+
+export async function approveReview(token: string, id: string, approved: boolean): Promise<ReviewRecord> {
+  return request<ReviewRecord>(`/content/reviews/${id}/approve?approved=${String(approved)}`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export async function deleteReview(token: string, id: string): Promise<void> {
+  await request<void>(`/content/reviews/${id}`, { method: "DELETE", token });
 }

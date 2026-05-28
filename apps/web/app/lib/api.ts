@@ -4,8 +4,10 @@ import type {
   DynamicPage,
   HeroStatement,
   MenuItem,
+  Post,
   ProductCard,
   ProductDetail,
+  ReviewStats,
   SiteSetting,
 } from "./content";
 import { normalizePath, stripHtmlSuffix } from "./paths";
@@ -69,7 +71,7 @@ export async function getPageByPath(path: string): Promise<DynamicPage | null> {
   for (const candidate of candidates) {
     const encoded = encodeURIComponent(candidate);
     const response = await fetch(`${API_BASE}/pages/by-path?path=${encoded}`, {
-      cache: "no-store",
+      next: { revalidate: 300 },
     });
 
     if (response.status === 404) {
@@ -77,7 +79,7 @@ export async function getPageByPath(path: string): Promise<DynamicPage | null> {
     }
 
     if (!response.ok) {
-      throw new Error(`API request failed (${response.status}) for /pages/by-path`);
+      continue;
     }
 
     return (await response.json()) as DynamicPage;
@@ -124,4 +126,24 @@ export async function searchProducts(query: string, limit = 6): Promise<ProductC
   return fetchFromApi<ProductCard[]>(`/products/search?${encoded}`);
 }
 
+export async function getPublishedPosts(): Promise<Post[]> {
+  return fetchFromApi<Post[]>("/posts");
+}
 
+export async function getPostBySlug(slug: string): Promise<Post | null> {
+  const response = await fetch(`${API_BASE}/posts/${encodeURIComponent(slug)}`, {
+    next: { revalidate: 300 },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`API request failed (${response.status}) for /posts/${slug}`);
+  return (await response.json()) as Post;
+}
+
+export async function getProductReviews(slug: string): Promise<ReviewStats | null> {
+  const response = await fetch(`${API_BASE}/products/${encodeURIComponent(slug)}/reviews`, {
+    next: { revalidate: 300 },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) return null;
+  return (await response.json()) as ReviewStats;
+}

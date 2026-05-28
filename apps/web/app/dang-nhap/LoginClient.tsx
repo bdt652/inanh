@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ApiError, loginGoogle, loginUser } from "../lib/customer-api";
@@ -10,7 +10,12 @@ import { useToastMessages } from "../components/ToastProvider";
 
 const TOKEN_STORAGE_KEY = "customerToken";
 
-export default function LoginClient() {
+type Props = {
+  loginPhoneEnabled?: boolean;
+  loginGoogleEnabled?: boolean;
+};
+
+export default function LoginClient({ loginPhoneEnabled = true, loginGoogleEnabled = true }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phone, setPhone] = useState("");
@@ -19,6 +24,9 @@ export default function LoginClient() {
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const googleButtonContainerRef = useRef<HTMLDivElement | null>(null);
+  const [pendingGoogleCredential, setPendingGoogleCredential] = useState<string | null>(null);
+  const [googlePhone, setGooglePhone] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   useToastMessages({ error, notice, setError, setNotice });
@@ -48,17 +56,13 @@ export default function LoginClient() {
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      return;
-    }
+    if (!clientId) return;
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
     script.onload = () => setGoogleReady(true);
     document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
+    return () => { document.body.removeChild(script); };
   }, []);
 
   const persistToken = (result: TokenResponse) => {
@@ -96,7 +100,48 @@ export default function LoginClient() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleCredential = async (credential: string) => {
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const result = await loginGoogle(credential);
+      persistToken(result);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400 && err.message.includes("số điện thoại")) {
+        setPendingGoogleCredential(credential);
+        setError("");
+      } else if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Không thể đăng nhập Google lúc này, vui lòng thử lại sau.");
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // Khởi tạo Google renderButton khi script load xong
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!googleReady || !clientId || !googleButtonContainerRef.current) return;
+    // @ts-expect-error - google accounts script exposes this API
+    const google = window.google?.accounts?.id;
+    if (!google) return;
+    google.initialize({
+      client_id: clientId,
+      callback: (response: { credential?: string }) => {
+        if (response.credential) void handleGoogleCredential(response.credential);
+      },
+    });
+    google.renderButton(googleButtonContainerRef.current, {
+      type: "icon",
+      theme: "outline",
+      size: "large",
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleReady]);
+
+  const handleGoogleLogin = () => {
     setError("");
     setNotice("");
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -104,36 +149,37 @@ export default function LoginClient() {
       setError("Google chưa sẵn sàng hoặc thiếu GOOGLE_CLIENT_ID.");
       return;
     }
-    // @ts-expect-error - google accounts script exposes this API
-    const google = window.google?.accounts?.id;
-    if (!google) {
-      setError("Không thể khởi tạo Google ID.");
+    // Click vào Google button thật (tránh FedCM One Tap flow)
+    const btn = googleButtonContainerRef.current?.querySelector<HTMLElement>("div[role=button]");
+    if (btn) {
+      btn.click();
+    } else {
+      setError("Không thể mở cửa sổ đăng nhập Google. Vui lòng thử lại.");
+    }
+  };
+
+  const handleGoogleWithPhone = async () => {
+    if (!pendingGoogleCredential) return;
+    const cleaned = googlePhone.trim();
+    if (!cleaned) {
+      setError("Vui lòng nhập số điện thoại.");
       return;
     }
     setGoogleLoading(true);
-    google.initialize({
-      client_id: clientId,
-      callback: async (response: { credential?: string }) => {
-        if (!response.credential) {
-          setError("Không lấy được token Google.");
-          setGoogleLoading(false);
-          return;
-        }
-        try {
-          const result = await loginGoogle(response.credential);
-          persistToken(result);
-        } catch (err) {
-          if (err instanceof ApiError) {
-            setError(err.message);
-          } else {
-            setError("Không thể đăng nhập Google lúc này, vui lòng thử lại sau.");
-          }
-        } finally {
-          setGoogleLoading(false);
-        }
-      },
-    });
-    google.prompt();
+    setError("");
+    try {
+      const result = await loginGoogle(pendingGoogleCredential, cleaned);
+      setPendingGoogleCredential(null);
+      persistToken(result);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Không thể đăng nhập Google lúc này, vui lòng thử lại sau.");
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -156,60 +202,112 @@ export default function LoginClient() {
             </Link>
           </div>
 
-          <form
-            className="mt-4 space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!loading) {
-                void handleAuth();
-              }
-            }}
-          >
-            <label className="grid gap-1 text-sm font-semibold text-[var(--text-soft,#4a4034)]">
-              Số điện thoại
-              <input
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="09xx..."
-                inputMode="tel"
-                className="rounded-2xl border border-stone-300 px-3 py-2 text-sm shadow-inner transition focus:border-[var(--accent,#b46a2f)] focus:outline-none"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-semibold text-[var(--text-soft,#4a4034)]">
-              Mật khẩu
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Nhập mật khẩu"
-                className="rounded-2xl border border-stone-300 px-3 py-2 text-sm shadow-inner transition focus:border-[var(--accent,#b46a2f)] focus:outline-none"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-2xl bg-[var(--accent-strong,#8a4d1f)] px-4 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+          {loginPhoneEnabled && (
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!loading) {
+                  void handleAuth();
+                }
+              }}
             >
-              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-            </button>
-          </form>
+              <label className="grid gap-1 text-sm font-semibold text-[var(--text-soft,#4a4034)]">
+                Số điện thoại
+                <input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="09xx..."
+                  inputMode="tel"
+                  className="rounded-2xl border border-stone-300 px-3 py-2 text-sm shadow-inner transition focus:border-[var(--accent,#b46a2f)] focus:outline-none"
+                />
+              </label>
+              <label className="grid gap-1 text-sm font-semibold text-[var(--text-soft,#4a4034)]">
+                Mật khẩu
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Nhập mật khẩu"
+                  className="rounded-2xl border border-stone-300 px-3 py-2 text-sm shadow-inner transition focus:border-[var(--accent,#b46a2f)] focus:outline-none"
+                />
+              </label>
 
-          <div className="mt-4 space-y-2">
-            <button
-              type="button"
-              onClick={() => void handleGoogleLogin()}
-              disabled={googleLoading || !googleReady}
-              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-stone-700 shadow-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-70"
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-2xl bg-[var(--accent-strong,#8a4d1f)] px-4 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+              </button>
+            </form>
+          )}
+
+          {loginGoogleEnabled && (
+            <div className="mt-4 space-y-2">
+              {/* Container ẩn để Google renderButton inject button thật — tránh FedCM One Tap */}
+              <div ref={googleButtonContainerRef} className="hidden" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => handleGoogleLogin()}
+                disabled={googleLoading || !googleReady}
+                className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-stone-700 shadow-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {googleLoading ? "Đang kết nối Google..." : "Đăng nhập với Google"}
+              </button>
+            </div>
+          )}
+
+          {pendingGoogleCredential && (
+            <form
+              className="mt-4 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"
+              onSubmit={(e) => { e.preventDefault(); void handleGoogleWithPhone(); }}
             >
-              {googleLoading ? "Đang kết nối Google..." : "Đăng nhập với Google"}
-            </button>
-          </div>
+              <p className="text-sm font-semibold text-emerald-800">
+                Lần đầu đăng nhập Google — nhập số điện thoại để liên kết tài khoản:
+              </p>
+              <label className="grid gap-1 text-sm font-semibold text-stone-700">
+                Số điện thoại
+                <input
+                  value={googlePhone}
+                  onChange={(e) => setGooglePhone(e.target.value)}
+                  placeholder="09xx..."
+                  inputMode="tel"
+                  autoFocus
+                  className="rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm shadow-inner transition focus:border-[var(--accent,#b46a2f)] focus:outline-none"
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={googleLoading}
+                  className="flex-1 rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"
+                >
+                  {googleLoading ? "Đang xử lý..." : "Xác nhận"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPendingGoogleCredential(null); setGooglePhone(""); }}
+                  className="rounded-2xl border border-stone-300 px-4 py-2 text-sm text-stone-600"
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!loginPhoneEnabled && !loginGoogleEnabled && (
+            <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-700">
+              Đăng nhập tạm thời bị tắt. Vui lòng liên hệ quản trị viên.
+            </p>
+          )}
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-soft,#4a4034)]">
-            <Link href={`/dang-ky?return=${encodeURIComponent(returnPath)}`} className="font-semibold text-[var(--accent-strong,#8a4d1f)] underline">
-              Chưa có tài khoản? Đăng ký
-            </Link>
+            {loginPhoneEnabled && (
+              <Link href={`/dang-ky?return=${encodeURIComponent(returnPath)}`} className="font-semibold text-[var(--accent-strong,#8a4d1f)] underline">
+                Chưa có tài khoản? Đăng ký
+              </Link>
+            )}
             <Link href={closeHref} className="underline">
               Về trang trước
             </Link>

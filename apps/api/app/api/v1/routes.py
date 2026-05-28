@@ -23,10 +23,14 @@ from app.api.v1.schemas import (
     HeroStatement,
     MenuItem,
     PingResponse,
+    PostRecord,
     Product,
     ProductCreate,
     ProductDetail,
     ProductView,
+    ReviewRecord,
+    ReviewStats,
+    ReviewSubmit,
     SiteSetting,
 )
 from app.core.config import settings
@@ -130,6 +134,10 @@ def _serialize_product_detail(doc: dict) -> ProductDetail:
         pricing_mode=_resolve_pricing_mode(doc),
         min_images=_resolve_optional_int(doc, "min_images"),
         max_images=_resolve_optional_int(doc, "max_images"),
+        tags=[str(t) for t in doc.get("tags", [])],
+        seo_title=str(doc.get("seo_title", "")),
+        seo_description=str(doc.get("seo_description", "")),
+        focus_keyword=str(doc.get("focus_keyword", "")),
     )
 
 
@@ -203,6 +211,8 @@ def _serialize_site_setting(doc: dict) -> SiteSetting:
         upload_require_verified_phone_threshold=int(doc.get("upload_require_verified_phone_threshold"))
         if doc.get("upload_require_verified_phone_threshold") is not None
         else None,
+        login_phone_enabled=bool(doc.get("login_phone_enabled", True)),
+        login_google_enabled=bool(doc.get("login_google_enabled", True)),
     )
 
 
@@ -446,4 +456,105 @@ async def create_product(
     if created is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load created product.")
     return _serialize_product(created)
+
+
+# ── Public: Posts (Hướng dẫn / Blog) ─────────────────────────────────────────
+
+def _serialize_post_public(doc: dict) -> PostRecord:
+    return PostRecord(
+        id=str(doc["_id"]),
+        slug=str(doc.get("slug", "")),
+        title=str(doc.get("title", "")),
+        summary=str(doc.get("summary", "")),
+        content=str(doc.get("content", "")),
+        cover_image=str(doc["cover_image"]) if doc.get("cover_image") else None,
+        is_published=bool(doc.get("is_published", False)),
+        tags=[str(t) for t in doc.get("tags", [])],
+        order=int(doc.get("order", 0)),
+        created_at=doc.get("created_at"),
+        updated_at=doc.get("updated_at"),
+        seo_title=str(doc.get("seo_title", "")),
+        seo_description=str(doc.get("seo_description", "")),
+        focus_keyword=str(doc.get("focus_keyword", "")),
+    )
+
+
+@router.get("/posts", response_model=list[PostRecord], tags=["content"], summary="List published posts")
+async def list_posts(db: AsyncIOMotorDatabase = Depends(get_db)) -> list[PostRecord]:
+    docs = await (
+        db["posts"].find({"is_published": True}).sort([("order", 1), ("created_at", -1)]).to_list(length=200)
+    )
+    return [_serialize_post_public(doc) for doc in docs if doc.get("slug")]
+
+
+@router.get("/posts/{slug}", response_model=PostRecord, tags=["content"], summary="Get published post by slug")
+async def get_post_by_slug(slug: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> PostRecord:
+    normalized = slug.strip()
+    if not normalized:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+    doc = await db["posts"].find_one({"slug": normalized, "is_published": True})
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+    return _serialize_post_public(doc)
+
+
+# ── Public: Product Reviews ───────────────────────────────────────────────────
+
+@router.post(
+    "/reviews",
+    response_model=ReviewRecord,
+    status_code=status.HTTP_201_CREATED,
+    tags=["content"],
+    summary="Submit a product review",
+)
+async def submit_review(payload: ReviewSubmit, db: AsyncIOMotorDatabase = Depends(get_db)) -> ReviewRecord:
+    product = await db["products"].find_one({"slug": payload.product_slug, "is_active": {"$ne": False}})
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+    from datetime import UTC, datetime  # local import to avoid circular at module level
+
+    doc = {**payload.model_dump(), "is_approved": False, "created_at": datetime.now(UTC)}
+    result = await db["product_reviews"].insert_one(doc)
+    created = await db["product_reviews"].find_one({"_id": result.inserted_id})
+    if created is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save review.")
+    return ReviewRecord(
+        id=str(created["_id"]),
+        product_slug=str(created["product_slug"]),
+        rating=int(created["rating"]),
+        body=str(created["body"]),
+        reviewer_name=str(created["reviewer_name"]),
+        is_approved=False,
+        created_at=created.get("created_at"),
+    )
+
+
+@router.get(
+    "/products/{slug}/reviews",
+    response_model=ReviewStats,
+    tags=["products"],
+    summary="Get approved reviews and aggregate rating for a product",
+)
+async def get_product_reviews(slug: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> ReviewStats:
+    normalized = slug.strip()
+    docs = await (
+        db["product_reviews"]
+        .find({"product_slug": normalized, "is_approved": True})
+        .sort("created_at", -1)
+        .to_list(length=200)
+    )
+    reviews = [
+        ReviewRecord(
+            id=str(doc["_id"]),
+            product_slug=str(doc["product_slug"]),
+            rating=int(doc["rating"]),
+            body=str(doc["body"]),
+            reviewer_name=str(doc["reviewer_name"]),
+            is_approved=True,
+            created_at=doc.get("created_at"),
+        )
+        for doc in docs
+    ]
+    avg = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else 0.0
+    return ReviewStats(product_slug=normalized, average_rating=avg, review_count=len(reviews), reviews=reviews)
 

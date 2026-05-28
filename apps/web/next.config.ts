@@ -137,17 +137,47 @@ const buildRemotePatterns = (): RemotePattern[] => {
     { protocol: "http", hostname: "localhost", port: "9000", pathname: "/**" },
     { protocol: "https", hostname: "inanh24h.com", pathname: "/**" },
     { protocol: "https", hostname: "www.inanh24h.com", pathname: "/**" },
-    { protocol: "https", hostname: "api.inanh24h.com", pathname: "/uploads/**" }
+    { protocol: "https", hostname: "api.inanh24h.com", pathname: "/uploads/**" },
+    { protocol: "https", hostname: "media.inanh24h.com", pathname: "/**" }
   );
 
   return uniquePatterns(patterns);
 };
 
+const SECURITY_HEADERS = [
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+];
+
 const nextConfig: NextConfig = {
   images: {
     unoptimized: disableImageOptimization,
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 30,
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384, 480],
     remotePatterns: buildRemotePatterns(),
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: SECURITY_HEADERS,
+      },
+    ];
+  },
+  async rewrites() {
+    return {
+      // Serve .html URLs from Next.js routes without redirecting the browser
+      beforeFiles: [
+        { source: "/tin-tuc.html", destination: "/tin-tuc" },
+        { source: "/tin-tuc/:slug.html", destination: "/tin-tuc/:slug" },
+        { source: "/san-pham/:slug.html", destination: "/san-pham/:slug" },
+      ],
+    };
   },
   async redirects() {
     return [
@@ -166,6 +196,22 @@ const nextConfig: NextConfig = {
           { type: "header", key: "x-forwarded-proto", value: "http" },
         ],
         destination: "https://inanh24h.com/:path*",
+        permanent: true,
+      },
+      // Canonical .html: redirect clean URLs to .html versions
+      {
+        source: "/tin-tuc",
+        destination: "/tin-tuc.html",
+        permanent: true,
+      },
+      {
+        source: "/tin-tuc/:slug([^.]+)",
+        destination: "/tin-tuc/:slug.html",
+        permanent: true,
+      },
+      {
+        source: "/san-pham/:slug([^.]+)",
+        destination: "/san-pham/:slug.html",
         permanent: true,
       },
     ];

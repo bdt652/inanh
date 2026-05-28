@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type ShareActionsProps = {
   url: string;
@@ -93,9 +93,13 @@ async function copyToClipboard(text: string): Promise<boolean> {
 
 export default function ShareActions({ url, title, description, className }: ShareActionsProps) {
   const [copied, setCopied] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
   const shareLinks = useMemo(() => buildShareLinks(url, title, description), [url, title, description]);
-  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const shareText = buildShareText(title, description);
+
+  useEffect(() => {
+    setCanNativeShare(typeof navigator.share === "function");
+  }, []);
 
   const handleCopy = async () => {
     const ok = await copyToClipboard(url);

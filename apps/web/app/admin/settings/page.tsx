@@ -24,6 +24,8 @@ const EMPTY_FORM: SettingsUpsert = {
   upload_max_files: undefined,
   upload_max_bytes: undefined,
   upload_require_verified_phone_threshold: undefined,
+  login_phone_enabled: true,
+  login_google_enabled: true,
 };
 
 export default function AdminSettingsPage() {
@@ -55,6 +57,8 @@ export default function AdminSettingsPage() {
           upload_max_files: settings.upload_max_files ?? undefined,
           upload_max_bytes: settings.upload_max_bytes ?? undefined,
           upload_require_verified_phone_threshold: settings.upload_require_verified_phone_threshold ?? undefined,
+          login_phone_enabled: settings.login_phone_enabled ?? true,
+          login_google_enabled: settings.login_google_enabled ?? true,
         });
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Không tải được cài đặt."))
@@ -81,6 +85,8 @@ export default function AdminSettingsPage() {
         upload_max_files: saved.upload_max_files ?? undefined,
         upload_max_bytes: saved.upload_max_bytes ?? undefined,
         upload_require_verified_phone_threshold: saved.upload_require_verified_phone_threshold ?? undefined,
+        login_phone_enabled: saved.login_phone_enabled ?? true,
+        login_google_enabled: saved.login_google_enabled ?? true,
       });
       setNotice("Đã lưu cài đặt.");
       setModalOpen(false);
@@ -141,6 +147,14 @@ export default function AdminSettingsPage() {
           <p><span className="font-semibold text-stone-900">Hotline:</span> {form.hotline_zalo || "-"}</p>
           <p><span className="font-semibold text-stone-900">Address:</span> {form.address || "-"}</p>
           <p><span className="font-semibold text-stone-900">Footer:</span> {form.footer || "-"}</p>
+          <p>
+            <span className="font-semibold text-stone-900">Đăng nhập SĐT:</span>{" "}
+            {form.login_phone_enabled ? "Bật" : "Tắt"}
+          </p>
+          <p>
+            <span className="font-semibold text-stone-900">Đăng nhập Google:</span>{" "}
+            {form.login_google_enabled ? "Bật" : "Tắt"}
+          </p>
           <p><span className="font-semibold text-stone-900">Trạng thái:</span> {loaded ? "Đã tải dữ liệu" : "Đang tải..."}</p>
         </div>
       </section>
@@ -281,6 +295,50 @@ export default function AdminSettingsPage() {
               }
               placeholder="VD 100"
             />
+          </label>
+
+          <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-4 md:col-span-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Phương thức đăng nhập khách</p>
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-stone-700">
+              <input
+                type="checkbox"
+                checked={form.login_phone_enabled ?? true}
+                onChange={(e) => setForm((prev) => ({ ...prev, login_phone_enabled: e.target.checked }))}
+              />
+              Đăng nhập bằng Số điện thoại + Mật khẩu
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-stone-700">
+              <input
+                type="checkbox"
+                checked={form.login_google_enabled ?? true}
+                onChange={(e) => setForm((prev) => ({ ...prev, login_google_enabled: e.target.checked }))}
+              />
+              Đăng nhập bằng Google
+              <span className="text-[11px] font-normal text-stone-400">(cần cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID)</span>
+            </label>
+          </div>
+
+          <label className="grid gap-1 text-sm font-semibold text-stone-700 md:col-span-2">
+            Văn bản footer (bản quyền)
+            <input
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm font-normal"
+              value={form.footer}
+              onChange={(event) => setForm((prev) => ({ ...prev, footer: event.target.value }))}
+              placeholder="© 2026 In ảnh 24h. All rights reserved."
+            />
+            <span className="text-[11px] font-normal text-stone-400">Hiển thị ở cuối trang (footer). Để trống sẽ dùng văn bản mặc định.</span>
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-stone-700 md:col-span-2">
+            Script nhúng (Google Tag Manager / Analytics)
+            <textarea
+              className="min-h-[100px] rounded-xl border border-stone-300 px-3 py-2 font-mono text-xs font-normal"
+              value={form.google_header}
+              onChange={(event) => setForm((prev) => ({ ...prev, google_header: event.target.value }))}
+              placeholder={"// Dán nội dung <script>...</script> hoặc code JS thuần vào đây\n// Sẽ được tự động nhúng vào trang sau khi tải xong"}
+              spellCheck={false}
+            />
+            <span className="text-[11px] font-normal text-stone-400">Script sẽ được inject sau khi trang load (afterInteractive). Hỗ trợ Google Tag Manager, pixel tracking, v.v.</span>
           </label>
         </form>
       </AdminModal>

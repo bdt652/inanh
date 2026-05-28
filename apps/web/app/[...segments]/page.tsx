@@ -5,19 +5,18 @@ import { notFound, redirect } from "next/navigation";
 import AmbientGlow from "../components/AmbientGlow";
 import FooterSection from "../components/FooterSection";
 import HeaderBar from "../components/HeaderBar";
+import { PageTransition, ScrollReveal } from "../components/motion";
 import ProductGrid from "../components/ProductGrid";
+import RichContentRenderer from "../components/RichContentRenderer";
 import ScrollProgress from "../components/ScrollProgress";
 import { getAllProducts, getBestSellers, getCategories, getMenuItems, getPageByPath, getSiteSettings } from "../lib/api";
 import type { ProductCard } from "../lib/content";
 import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 import { normalizePath, stripHtmlSuffix, toHtmlPath } from "../lib/paths";
 import { sanitizeRichHtml } from "../lib/sanitize";
+import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from "../lib/seo";
 
-const SITE_NAME = "In ảnh 24h";
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
-const DEFAULT_OG_IMAGE = "/Inanh/logo_inanh24h.jpg";
-
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type DynamicPageProps = {
   params: Promise<{ segments: string[] }>;
@@ -33,12 +32,24 @@ function toRawPath(segments: string[]): string {
   return normalizePath(joined);
 }
 
+function hasNonHtmlExtension(rawPath: string): boolean {
+  const lastSegment = rawPath.split("/").pop() ?? "";
+  const dotIndex = lastSegment.lastIndexOf(".");
+  if (dotIndex === -1) return false;
+  const ext = lastSegment.slice(dotIndex + 1).toLowerCase();
+  return ext !== "html";
+}
+
 function resolveLegacyRedirect(rawPath: string): string | null {
   const lowered = rawPath.toLowerCase();
   if (lowered === "/san-pham.html") return "/san-pham";
   if (lowered.startsWith("/san-pham/") && lowered.endsWith(".html")) return rawPath.slice(0, -5);
   if (lowered === "/admin.html") return "/admin";
   if (lowered.startsWith("/admin/") && lowered.endsWith(".html")) return rawPath.slice(0, -5);
+  if (lowered === "/quan-ly-don-hang/cart.html") return "/quan-ly-don-hang/cart";
+  if (lowered.startsWith("/quan-ly-don-hang/") && lowered.endsWith(".html")) return rawPath.slice(0, -5);
+  if (lowered === "/tin-tuc.html") return "/tin-tuc";
+  if (lowered.startsWith("/tin-tuc/") && lowered.endsWith(".html")) return rawPath.slice(0, -5);
   return null;
 }
 
@@ -60,29 +71,16 @@ function absoluteUrl(path: string): string {
 
 function buildBreadcrumb(path: string, title: string) {
   const parts = path.split("/").filter(Boolean);
-  const items = [
-    {
-      "@type": "ListItem",
-      position: 1,
-      name: "Trang chủ",
-      item: SITE_URL,
-    },
-  ];
+  const items: Array<{ name: string; url: string }> = [{ name: "Trang chủ", url: SITE_URL }];
   let current = "";
   parts.forEach((part, idx) => {
     current += `/${part}`;
     items.push({
-      "@type": "ListItem",
-      position: idx + 2,
       name: idx === parts.length - 1 ? title : part.replace(/-/g, " "),
-      item: absoluteUrl(current),
+      url: absoluteUrl(current),
     });
   });
-  return {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: items,
-  };
+  return buildBreadcrumbJsonLd(items);
 }
 
 async function resolveDynamicContext(path: string) {
@@ -146,6 +144,9 @@ function resolveRenderableContent(rawContent: string, fallbackAlt?: string): str
 export async function generateMetadata({ params }: DynamicPageProps): Promise<Metadata> {
   const { segments } = await params;
   const rawPath = toRawPath(segments);
+  if (hasNonHtmlExtension(rawPath)) {
+    return { title: "Không tìm thấy trang", robots: { index: false, follow: false } };
+  }
   const redirectPath = resolveLegacyRedirect(rawPath);
   if (redirectPath) {
     return {
@@ -201,6 +202,9 @@ export async function generateMetadata({ params }: DynamicPageProps): Promise<Me
 export default async function DynamicPage({ params }: DynamicPageProps) {
   const { segments } = await params;
   const rawPath = toRawPath(segments);
+  if (hasNonHtmlExtension(rawPath)) {
+    notFound();
+  }
   const redirectPath = resolveLegacyRedirect(rawPath);
   if (redirectPath) {
     redirect(redirectPath);
@@ -255,19 +259,31 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
   const fallbackProducts = bestSellers.length > 0 ? bestSellers : products;
   const displayProducts = categoryProducts.length > 0 ? categoryProducts : fallbackProducts.slice(0, 8);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    name: title,
-    description,
-    inLanguage: "vi-VN",
-    url: absoluteUrl(path),
-    isPartOf: {
-      "@type": "WebSite",
-      name: SITE_NAME,
-      url: SITE_URL,
-    },
-  };
+  const pageUrl = absoluteUrl(path);
+  const jsonLd = categoryMatch
+    ? {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: title,
+        description,
+        inLanguage: "vi-VN",
+        url: pageUrl,
+        isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+        hasPart: categoryProducts.slice(0, 20).map((p) => ({
+          "@type": "Product",
+          name: p.title,
+          url: `${SITE_URL}/san-pham/${encodeURIComponent(p.slug ?? p.id ?? "")}`,
+        })),
+      }
+    : {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: title,
+        description,
+        inLanguage: "vi-VN",
+        url: pageUrl,
+        isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+      };
 
   return (
     <div className="relative min-h-screen">
@@ -276,9 +292,16 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
       <ScrollProgress />
 
       <main className="w-full pb-14 pt-8">
+        <PageTransition>
         <article className="panel-plain w-full rounded-none px-4 py-6 md:px-10 md:py-10">
+          <ScrollReveal variant="bounceIn">
           <h1 className="font-display text-4xl font-semibold md:text-5xl">{title}</h1>
+          {summary && (
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--text-soft)]">{summary}</p>
+          )}
+          </ScrollReveal>
           {categoryMatch?.img && (
+            <ScrollReveal variant="zoomIn" delay={0.1}>
             <div className="photo-frame mt-6 overflow-hidden rounded-none">
               <Image
                 src={normalizeImageUrl(categoryMatch.img)}
@@ -290,15 +313,19 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
                 unoptimized={shouldSkipImageOptimization(categoryMatch.img)}
               />
             </div>
+            </ScrollReveal>
           )}
           {renderedContent && (
-            <div
-              className="rich-content mt-6 text-sm leading-7 text-[var(--text-soft)] md:text-base"
-              dangerouslySetInnerHTML={{ __html: renderedContent }}
-            />
+            <section className="mt-8 border-t border-[var(--line)] pt-8">
+              <RichContentRenderer
+                html={renderedContent}
+                className="rich-content text-sm leading-7 text-[var(--text-soft)] md:text-base"
+              />
+            </section>
           )}
 
           {categoryMatch && displayProducts.length > 0 && (
+            <ScrollReveal variant="fadeUp" delay={0.3}>
             <section className="mt-10 border-t border-[var(--line)] pt-8">
               <ProductGrid
                 header={categoryProducts.length > 0 ? categoryMatch.label : "Gợi ý nổi bật"}
@@ -309,8 +336,10 @@ export default async function DynamicPage({ params }: DynamicPageProps) {
                 viewMoreLabel="Xem thêm sản phẩm"
               />
             </section>
+            </ScrollReveal>
           )}
         </article>
+        </PageTransition>
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

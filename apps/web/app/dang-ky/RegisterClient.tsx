@@ -7,7 +7,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, registerUser } from "../lib/customer-api";
 import { useToastMessages } from "../components/ToastProvider";
 
-export default function RegisterClient() {
+type Props = {
+  loginPhoneEnabled?: boolean;
+};
+
+export default function RegisterClient({ loginPhoneEnabled = true }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phone, setPhone] = useState("");
@@ -84,11 +88,17 @@ export default function RegisterClient() {
             </Link>
           </div>
 
+          {!loginPhoneEnabled && (
+            <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-700">
+              Đăng ký tạm thời bị tắt. Vui lòng liên hệ quản trị viên.
+            </p>
+          )}
+
           <form
-            className="mt-4 space-y-3"
+            className={`mt-4 space-y-3 ${!loginPhoneEnabled ? "pointer-events-none opacity-40" : ""}`}
             onSubmit={(event) => {
               event.preventDefault();
-              if (!loading) {
+              if (!loading && loginPhoneEnabled) {
                 void handleRegister();
               }
             }}

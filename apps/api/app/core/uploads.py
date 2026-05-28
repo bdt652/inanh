@@ -3,10 +3,14 @@ from pathlib import Path
 import json
 from fastapi import Request
 
-from app.core.storage import _is_local_backend
-
 UPLOADS_ROUTE_PREFIX = "/uploads"
 UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads"
+
+
+def _is_local_backend() -> bool:
+    """Check if using local storage backend (avoids circular import with storage.py)."""
+    from app.core.config import settings
+    return settings.storage_backend.strip().lower() == "local"
 
 
 def ensure_uploads_dir() -> Path:
@@ -58,7 +62,7 @@ def build_public_upload_url(request: Request, relative_path: str) -> str:
     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
     if proto and host:
         base = f"{proto}://{host}".rstrip("/")
-        return f"{base}/{UPLOADS_ROUTE_PREFIX}/{normalized_path}"
+        return f"{base}{UPLOADS_ROUTE_PREFIX}/{normalized_path}"
 
     # Fallback: use request.base_url (works in development)
-    return f"{str(request.base_url).rstrip('/')}/{UPLOADS_ROUTE_PREFIX}/{normalized_path}"
+    return f"{str(request.base_url).rstrip('/')}{UPLOADS_ROUTE_PREFIX}/{normalized_path}"

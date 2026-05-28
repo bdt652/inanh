@@ -1,6 +1,5 @@
 ﻿"use client";
 
-/* eslint-disable @next/next/no-img-element */
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
@@ -87,7 +86,14 @@ export default function ProductImageGallery({ productName, images }: ProductImag
               }`}
               aria-label={`Xem ảnh ${index + 1}`}
             >
-              <img src={imageUrl} alt={`${productName} - ảnh ${index + 1}`} className="h-20 w-24 object-cover md:h-24 md:w-32" />
+              <Image
+                src={normalizeImageUrl(imageUrl)}
+                alt={`${productName} - ảnh ${index + 1}`}
+                width={128}
+                height={96}
+                className="h-20 w-24 object-cover md:h-24 md:w-32"
+                unoptimized={shouldSkipImageOptimization(imageUrl)}
+              />
             </button>
           ))}
         </div>
@@ -132,6 +138,7 @@ export default function ProductImageGallery({ productName, images }: ProductImag
             </div>
 
             <div className="relative flex-1 overflow-auto">
+              {/* eslint-disable-next-line @next/next/no-img-element -- zoom requires dynamic width beyond viewport, incompatible with next/image */}
               <img
                 src={resolvedActiveImage}
                 alt={productName}

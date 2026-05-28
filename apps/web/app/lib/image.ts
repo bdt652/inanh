@@ -1,5 +1,6 @@
 const LOCAL_IMAGE_PATTERN =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0|host\.docker\.internal)(?::\d+)?\//i;
+const SKIP_OPTIMIZATION_HOSTS = new Set<string>();
 const FALLBACK_HTTPS_HOSTS = new Set(["api.inanh24h.com", "inanh24h.com", "www.inanh24h.com"]);
 
 const deriveBackendUrl = (): string => {
@@ -30,7 +31,13 @@ const resolvedBackendHost = (() => {
 })();
 
 export function shouldSkipImageOptimization(src: string): boolean {
-  return LOCAL_IMAGE_PATTERN.test(src.trim());
+  const trimmed = src.trim();
+  if (LOCAL_IMAGE_PATTERN.test(trimmed)) return true;
+  try {
+    return SKIP_OPTIMIZATION_HOSTS.has(new URL(trimmed).hostname);
+  } catch {
+    return false;
+  }
 }
 
 export function normalizeImageUrl(src: string): string {

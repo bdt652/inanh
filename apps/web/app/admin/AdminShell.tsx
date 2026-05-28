@@ -7,9 +7,11 @@ import type { ReactNode } from "react";
 const NAV_ITEMS = [
   { href: "/admin", label: "Tổng quan" },
   { href: "/admin/pages", label: "Pages" },
+  { href: "/admin/tin-tuc", label: "Tin tức" },
   { href: "/admin/menu", label: "Menu" },
   { href: "/admin/categories", label: "Danh mục" },
   { href: "/admin/products", label: "Sản phẩm" },
+  { href: "/admin/reviews", label: "Đánh giá" },
   { href: "/admin/orders", label: "Đơn hàng" },
   { href: "/admin/drafts", label: "Lưu nháp" },
   { href: "/admin/users", label: "Users" },

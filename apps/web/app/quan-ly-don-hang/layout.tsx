@@ -31,9 +31,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     safe(getSiteSettings, null),
   ]);
 
+  const loginPhoneEnabled = siteSettings?.login_phone_enabled ?? true;
+  const loginGoogleEnabled = siteSettings?.login_google_enabled ?? true;
+
   return (
     <Suspense fallback={<div className="min-h-screen w-full bg-[var(--surface-soft,#f8f3eb)]" />}>
-      <RequireCustomerLogin>
+      <RequireCustomerLogin loginPhoneEnabled={loginPhoneEnabled} loginGoogleEnabled={loginGoogleEnabled}>
         <div className="min-h-screen w-full bg-[var(--surface-soft,#f8f3eb)] text-[var(--text-main,#1f1b16)]">
           <HeaderBar menuItems={menuItems} logoUrl={siteSettings?.logo_url} />
 

@@ -1,5 +1,4 @@
 ﻿import type { Metadata } from "next";
-export const dynamic = "force-dynamic";
 
 import AmbientGlow from "./components/AmbientGlow";
 import BannerSlider from "./components/BannerSlider";
@@ -7,8 +6,8 @@ import CategoryGrid from "./components/CategoryGrid";
 import FooterSection from "./components/FooterSection";
 import HeaderBar from "./components/HeaderBar";
 import HeroCards from "./components/HeroCards";
+import { ScrollReveal } from "./components/motion";
 import ProductGrid from "./components/ProductGrid";
-import RevealSection from "./components/RevealSection";
 import ScrollProgress from "./components/ScrollProgress";
 import {
   getBanners,
@@ -20,9 +19,9 @@ import {
 } from "./lib/api";
 import { normalizeImageUrl } from "./lib/image";
 import { toHtmlPath } from "./lib/paths";
+import { buildBreadcrumbJsonLd, SITE_NAME, SITE_URL } from "./lib/seo";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://inanh24h.com").replace(/\/+$/, "");
-const SITE_NAME = "In ảnh 24h";
+export const revalidate = 300;
 
 async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
@@ -92,18 +91,7 @@ export default async function Home() {
       logo: siteSettings?.logo_url ? { "@type": "ImageObject", url: siteSettings.logo_url } : undefined,
     },
   };
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Trang chủ",
-        item: SITE_URL,
-      },
-    ],
-  };
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([{ name: "Trang chủ", url: SITE_URL }]);
   const howToJsonLd = {
     "@context": "https://schema.org",
     "@type": "HowTo",
@@ -138,16 +126,34 @@ export default async function Home() {
     "@type": "QAPage",
     mainEntity: {
       "@type": "Question",
-      name: "In ảnh ở đâu chất lượng và giá rẻ?",
-      answer: {
+      name: "In ảnh ở đâu chất lượng và giá rẻ tại Hà Nội?",
+      text: "In ảnh ở đâu chất lượng và giá rẻ tại Hà Nội?",
+      answerCount: 1,
+      datePublished: "2026-02-17T21:50:00+07:00",
+      author: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+      acceptedAnswer: {
         "@type": "Answer",
-        text: "In ảnh 24h là địa chỉ in ảnh uy tín tại Hà Nội với hơn 10 năm kinh nghiệm. Chúng tôi cung cấp dịch vụ in ảnh chất lượng cao, giá cạnh tranh với nhiều kích thước và chất liệu đa dạng. Đặc biệt, in nhanh trong ngày, giao hàng tận nơi.",
+        text: "In ảnh 24h là địa chỉ in ảnh uy tín tại Hà Nội với hơn 10 năm kinh nghiệm in ấn chuyên nghiệp. Chúng tôi cung cấp đầy đủ dịch vụ: in ảnh kỹ thuật số, in album ảnh cưới, in tranh treo tường khổ lớn, in ảnh trên gỗ, in canvas và in ảnh lấy ngay. Điểm nổi bật: chuẩn màu theo ICC profile, in và giao hàng tận nơi trong 24h, báo giá minh bạch không phát sinh, hỗ trợ tư vấn qua Zalo — không cần đến cửa hàng. Phục vụ cả khách lẻ và đơn số lượng lớn với giá cạnh tranh nhất Hà Nội.",
+        datePublished: "2026-02-17T21:50:00+07:00",
+        url: SITE_URL,
+        upvoteCount: 12,
+        author: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
       },
     },
   };
 
+  const firstBannerUrl = banners[0]?.img ? normalizeImageUrl(banners[0].img) : null;
+
   return (
     <div className="relative min-h-screen">
+      {firstBannerUrl && (
+        <link
+          rel="preload"
+          as="image"
+          href={`/_next/image?${new URLSearchParams({ url: firstBannerUrl, w: "1200", q: "75" })}`}
+          fetchPriority="high"
+        />
+      )}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-none focus:bg-white focus:px-4 focus:py-2"
@@ -159,13 +165,13 @@ export default async function Home() {
       <ScrollProgress />
       <BannerSlider slides={banners} />
       <main id="main-content" className="w-full px-4 pb-12 md:px-8">
-        <RevealSection delay={100}>
+        <ScrollReveal variant="bounceIn" delay={0.1}>
           <HeroCards statements={heroStatements} />
-        </RevealSection>
-        <RevealSection delay={250}>
+        </ScrollReveal>
+        <ScrollReveal variant="zoomIn" delay={0.15}>
           <CategoryGrid categories={categories} />
-        </RevealSection>
-        <RevealSection delay={350}>
+        </ScrollReveal>
+        <ScrollReveal variant="fadeUp" delay={0.2}>
           <ProductGrid
             header=""
             subtitle="Sản phẩm nổi bật"
@@ -174,7 +180,7 @@ export default async function Home() {
             viewMoreHref="/san-pham"
             viewMoreLabel="Xem thêm sản phẩm"
           />
-        </RevealSection>
+        </ScrollReveal>
       </main>
       <FooterSection categories={categories} settings={siteSettings} />
 

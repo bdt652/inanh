@@ -1,14 +1,14 @@
 # CLAUDE.md
 
-File này cung cấp hướng dẫn cho Claude Code (claude.ai/code) khi làm việc với mã nguồn trong repository này.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Tổng quan dự án
 
 Đây là một monorepo chứa ứng dụng web Next.js 16 và backend FastAPI cho "InAnh24h" - dịch vụ in ảnh online tại Việt Nam.
 
 ### Công nghệ sử dụng
-- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS 4, pnpm
-- **Backend**: FastAPI, Python 3.11+, Motor (MongoDB async), Pydantic
+- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS 4, pnpm, TipTap/ProseMirror (rich text editor)
+- **Backend**: FastAPI, Python 3.11+, Motor (MongoDB async), Pydantic, Pillow (image processing)
 - **Hạ tầng**: Docker, MongoDB, MinIO (storage tương thích S3)
 
 ### Cấu trúc thư mục
@@ -16,7 +16,6 @@ File này cung cấp hướng dẫn cho Claude Code (claude.ai/code) khi làm vi
 apps/
   web/           # Frontend Next.js (port 3000)
   api/           # Backend FastAPI (port 8000)
-deploy/          # Cấu hình Docker Compose cho production
 ```
 
 ## Các lệnh thường dùng
@@ -26,10 +25,11 @@ deploy/          # Cấu hình Docker Compose cho production
 # Khởi động hạ tầng (MongoDB + MinIO)
 docker compose up -d
 
-# Backend (PowerShell)
+# Backend
 cd apps/api
 python -m venv .venv
-.venv\Scripts\Activate.ps1
+source .venv/bin/activate    # Linux/Mac
+# .venv\Scripts\Activate.ps1  # PowerShell
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
@@ -55,15 +55,14 @@ pytest -k "test_admin"         # Chạy tests khớp với pattern
 **Frontend:**
 ```bash
 cd apps/web
-pnpm lint                       # Kiểm tra TypeScript/React
+pnpm lint                       # ESLint kiểm tra TypeScript/React
 pnpm build                      # Build production
-pnpm -C apps/web type-check    # Kiểm tra kiểu TypeScript
 ```
 
 ### Triển khai Production
 ```bash
-cd deploy
-docker compose -f compose.yml up -d --build
+# Build & chạy tất cả services qua Docker Compose
+docker compose up -d --build
 ```
 
 ## Kiến trúc hệ thống
@@ -77,7 +76,7 @@ app/
   api/v1/
     routes.py           # Main router tập hợp các sub-router
     auth.py             # Xác thực Admin (JWT)
-    customer_auth.py    # Xác thực Khách hàng (phone/OTP, Google OAuth)
+    customer_auth.py    # Xác thực Khách hàng (phone/OTP, Google OAuth) - imported bởi users.py
     content_admin.py    # Endpoints công khai (banners, categories, etc.)
     admin_manage.py     # CRUD riscontent dành riêng cho Admin
     uploads.py          # Quản lý upload session
@@ -92,11 +91,11 @@ app/
     uploads.py          # Helper validation file upload
   db/
     mongo.py            # Motor client, connection pooling, index management
-  main.py                # FastAPI app factory với lifespan hooks
+  main.py                # FastAPI app (module-level instance, không phải factory) với lifespan hooks
 ```
 
 **Luồng xử lý request:**
-1. `main.py` tạo FastAPI app với CORS và lifespan (khởi tạo index + kiểm tra storage)
+1. `main.py` tạo module-level FastAPI `app` với CORS và lifespan (khởi tạo index với timeout 2s + kiểm tra storage với timeout 3s; log warning và tiếp tục nếu không kết nối được)
 2. Routes được đăng ký dưới prefix `/api/v1`
 3. Endpoints admin được bảo vệ bởi dependency `require_admin` (JWT từ header `Authorization: Bearer`)
 4. Endpoints khách hàng sử dụng phone OTP hoặc Google OAuth
@@ -115,7 +114,7 @@ app/
   admin/               # Admin dashboard (nhiều client components)
     AdminShell.tsx     # Layout với sidebar navigation
     api.ts             # Frontend API client với auth headers
-    banners/, categories/, hero/, menu/, pages/, products/, settings/  # Pages CRUD
+    banners/, categories/, hero/, menu/, pages/, products/, settings/, orders/, users/, drafts/  # Pages CRUD
   [...segments]/       # Catch-all cho dynamic pages (legacy pages route)
   dang-ky/             # Đăng ký khách hàng
   dang-nhap/           # Đăng nhập khách hàng
@@ -131,9 +130,11 @@ app/
 
 **Mẫu Components:**
 - Server components fetch data trực tiếp từ API (không dùng useState/useEffect)
-- Client components dùng directive `'use client'` khi cần intertivity
+- Client components dùng directive `'use client'` khi cần interactivity
 - Admin pages chủ yếu là client components với React state
-- Tailwind CSS v4: cấu hình import trong `content` config + styles tùy chỉnh trong `globals.css`
+- Rich text editor dùng TipTap (ProseMirror-based) cho admin CMS pages; legacy `react-quill` cũng còn trong codebase
+- TypeScript path alias: `@/*` maps to `./` (root of `apps/web`)
+- Tailwind CSS v4: PostCSS plugin `@tailwindcss/postcss`, `@import "tailwindcss"` trong `globals.css`; custom theme qua CSS custom properties trong `:root` và `@theme inline`
 
 ### Các Collection MongoDB
 
@@ -178,8 +179,8 @@ Indexes được tạo tự động khi startup qua `ensure_indexes()` trong `mo
 - Dynamic CMS pages: `GET /api/v1/pages/by-path?path=/gioi-thieu`
 
 **4. Storage Backend:**
-- `STORAGE_BACKEND=minio`: Files lưu trong MinIO bucket, served qua proxy `/uploads/{path}`
-- `STORAGE_BACKEND=local`: Files lưu trong volume `apps/api/app/uploads/`, served tương tự
+- `STORAGE_BACKEND=minio`: Files lưu trong MinIO bucket, served qua proxy `/uploads/{path}`. **Bắt buộc cho production.**
+- `STORAGE_BACKEND=local`: Files lưu trong volume `apps/api/app/uploads/`, served tương tự. **Chỉ dùng cho development.**
 - Cả hai backend trả header `Cache-Control: public, max-age=31536000, immutable`
 
 ### Xác thực
@@ -202,7 +203,7 @@ Admin tokens là JWT stateless signed với `ADMIN_TOKEN_SECRET`. Customer token
 - API endpoints mới cần ít nhất test cho success + failure paths
 - Dùng Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`
 - Frontend: Ưu tiên server components; dùng `'use client'` chỉ khi cần (interactivity, state)
-- Tailwind CSS v4: `@import "tailwindcss"` trong `globals.css`; tùy chỉnh trong `content` array của `tailwind.config`
+- Tailwind CSS v4: `@import "tailwindcss"` trong `globals.css`; custom theme qua CSS custom properties trong `:root` và `@theme inline`; không cần `tailwind.config` file
 
 ## Biến môi trường
 
@@ -214,7 +215,7 @@ Xem `.env.example` để danh sách đầy đủ với mô tả. Các biến qua
 - `ADMIN_TOKEN_SECRET` - JWT signing key cho admin tokens (bắt buộc)
 - `ADMIN_BOOTSTRAP_SECRET` - Secret để tạo admin đầu tiên (bắt buộc)
 - `CUSTOMER_TOKEN_SECRET` - JWT signing key cho customer tokens (bắt buộc)
-- `STORAGE_BACKEND` - `minio` (mặc định) hoặc `local`
+- `STORAGE_BACKEND` - `minio` (mặc định, bắt buộc cho production) hoặc `local` (chỉ dev)
 - `MINIO_*` - MinIO connection settings
 - `SMS_PROVIDER_*` - SMS gateway cho OTP (hoặc set `PHONE_OTP_DEBUG=true` cho dev)
 
@@ -223,6 +224,8 @@ Xem `.env.example` để danh sách đầy đủ với mô tả. Các biến qua
 - `NEXT_PUBLIC_BACKEND_URL` - Backend base (ví dụ: `http://localhost:8000`)
 - `NEXT_PUBLIC_SITE_URL` - Canonical site URL cho SEO
 - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` - Google OAuth client ID (nếu enable)
+- `NEXT_PUBLIC_UPLOAD_MODE` - `presigned` (MinIO presigned URLs) cho client-side upload
+- `NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL` - Public MinIO URL cho truy cập media trực tiếp
 
 **Infrastructure:**
 - `CORS_ALLOW_ORIGINS` - Comma-separated allowed origins cho CORS
@@ -293,16 +296,18 @@ MongoDB `_id` (ObjectId) được serialize thành string `id` trong tất cả 
 - Code mới nên dùng `products`; `product_views` giữ lại để backward compatibility với homepage "best sellers" fallback
 
 ### Tailwind CSS v4
-- Cấu hình dựa trên import: `@import "tailwindcss"` trong `app/globals.css`
-- Custom theme extends qua CSS custom properties (xem `:root` trong `globals.css`)
-- Không cần nội dung `tailwind.config.js` trong hầu hết trường hợp; `content` array trong `tailwind.config.ts` scan `app/**/*.{ts,tsx}`
+- Cấu hình dựa trên PostCSS plugin `@tailwindcss/postcss` (xem `postcss.config.mjs`)
+- `@import "tailwindcss"` trong `app/globals.css`
+- Custom theme extends qua CSS custom properties trong `:root` và `@theme inline` block (xem `globals.css`)
+- Không dùng `tailwind.config` file — Tailwind v4 tự động scan content
 
 ## Docker Notes
 
 - `docker-compose.yml` định nghĩa 3 services: `minio`, `api`, `web`
 - Named volumes: `minio-data` (lưu objects), `api-uploads` (lưu uploads local)
-- Production dùng `deploy/compose.yml` với cấu trúc tương tự nhưng tối ưu cho production domains
-- Build args: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`, `API_INTERNAL_URL`
+- Build args: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_BACKEND_URL`, `NEXT_PUBLIC_UPLOAD_MODE`, `NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL`, `API_INTERNAL_URL`
+- `next.config.ts` tự động load `NEXT_PUBLIC_*` vars từ root `.env` (2 levels up từ `apps/web`)
+- API docs khi dev: Swagger UI tại `http://localhost:8000/docs`, ReDoc tại `http://localhost:8000/redoc`
 
 ## API Reference (Selected Endpoints)
 

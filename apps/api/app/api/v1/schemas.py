@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -329,6 +330,8 @@ class SiteSetting(BaseModel):
     upload_max_files: int | None = None
     upload_max_bytes: int | None = None
     upload_require_verified_phone_threshold: int | None = None
+    login_phone_enabled: bool = True
+    login_google_enabled: bool = True
 
 
 class SiteSettingUpsert(BaseModel):
@@ -343,6 +346,8 @@ class SiteSettingUpsert(BaseModel):
     upload_max_files: int | None = Field(default=None, ge=1, le=50_000)
     upload_max_bytes: int | None = Field(default=None, ge=1, le=200_000_000_000)
     upload_require_verified_phone_threshold: int | None = Field(default=None, ge=1, le=50_000)
+    login_phone_enabled: bool = True
+    login_google_enabled: bool = True
 
     @model_validator(mode="after")
     def validate_upload_limits(self) -> "SiteSettingUpsert":
@@ -473,6 +478,10 @@ class ProductDetail(Product):
     pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = None
     max_images: int | None = None
+    tags: list[str] = Field(default_factory=list)
+    seo_title: str = ""
+    seo_description: str = ""
+    focus_keyword: str = ""
 
 
 class ProductCreate(BaseModel):
@@ -511,6 +520,10 @@ class ProductUpsert(BaseModel):
     pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = Field(default=None, ge=1, le=50_000)
     max_images: int | None = Field(default=None, ge=1, le=50_000)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    seo_title: str = Field(default="", max_length=70)
+    seo_description: str = Field(default="", max_length=160)
+    focus_keyword: str = Field(default="", max_length=100)
 
     @model_validator(mode="after")
     def normalize_images(self) -> "ProductUpsert":
@@ -557,3 +570,51 @@ class ProductRecord(BaseModel):
     pricing_mode: Literal["combo", "retail"] = "retail"
     min_images: int | None = None
     max_images: int | None = None
+    tags: list[str] = Field(default_factory=list)
+    seo_title: str = ""
+    seo_description: str = ""
+    focus_keyword: str = ""
+
+
+class PostUpsert(BaseModel):
+    slug: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=300)
+    summary: str = Field(default="", max_length=500)
+    content: str = Field(default="")
+    cover_image: str | None = Field(default=None, max_length=1000)
+    is_published: bool = Field(default=False)
+    tags: list[str] = Field(default_factory=list, max_length=10)
+    order: int = Field(default=0)
+    seo_title: str = Field(default="", max_length=70)
+    seo_description: str = Field(default="", max_length=160)
+    focus_keyword: str = Field(default="", max_length=100)
+
+
+class PostRecord(PostUpsert):
+    id: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ReviewSubmit(BaseModel):
+    product_slug: str = Field(min_length=1, max_length=200)
+    rating: int = Field(ge=1, le=5)
+    body: str = Field(min_length=10, max_length=2000)
+    reviewer_name: str = Field(min_length=1, max_length=100)
+
+
+class ReviewRecord(BaseModel):
+    id: str
+    product_slug: str
+    rating: int
+    body: str
+    reviewer_name: str
+    is_approved: bool
+    created_at: datetime | None = None
+
+
+class ReviewStats(BaseModel):
+    product_slug: str
+    average_rating: float
+    review_count: int
+    reviews: list[ReviewRecord]

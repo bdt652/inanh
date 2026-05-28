@@ -4,6 +4,7 @@ const allowedTags = [
   "a",
   "blockquote",
   "br",
+  "button",
   "code",
   "div",
   "em",
@@ -14,13 +15,17 @@ const allowedTags = [
   "h5",
   "h6",
   "hr",
+  "i",
   "img",
   "li",
   "ol",
   "p",
   "pre",
+  "script",
+  "section",
   "span",
   "strong",
+  "style",
   "s",
   "table",
   "tbody",
@@ -34,8 +39,10 @@ const allowedTags = [
 
 const allowedAttributes: Record<string, string[]> = {
   a: ["href", "name", "target", "rel"],
-  img: ["src", "alt", "title", "width", "height", "loading"],
-  "*": ["class"],
+  img: ["src", "alt", "title", "width", "height", "loading", "style"],
+  script: ["type"],
+  style: ["type"],
+  "*": ["class", "id", "style"],
 };
 
 const allowedSchemes = ["http", "https", "mailto", "tel"];
@@ -48,6 +55,9 @@ export function sanitizeRichHtml(rawHtml: string): string {
     allowedSchemesByTag: {
       img: ["http", "https"],
     },
+    // Mặc định sanitize-html loại bỏ nội dung bên trong style/script.
+    // Override để giữ lại — admin content tin tưởng được.
+    nonTextTags: ["textarea", "option", "noscript"],
     transformTags: {
       a: (tagName, attribs) => {
         const target = attribs.target;

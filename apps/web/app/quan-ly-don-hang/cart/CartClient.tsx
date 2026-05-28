@@ -28,7 +28,7 @@ import { resolveFileBase } from "../../lib/api-base";
 import { useToast, useToastMessages } from "../../components/ToastProvider";
 
 const PRICE_DEFAULT = 2500;
-const ZALO_URL = "https://zalo.me/0877226644";
+const ZALO_URL = "https://zalo.me/3509964870539338786";
 const FILE_BASE = resolveFileBase(); // Uses MinIO direct URLs if configured, otherwise backend proxy
 const LOCAL_DRAFT_KEY = "inanh24h-cart-draft";
 const UPLOAD_MODE = (process.env.NEXT_PUBLIC_UPLOAD_MODE ?? "direct").toLowerCase();
@@ -584,6 +584,7 @@ export default function CartPage() {
     const trimmed = slug.trim();
     const selected = trimmed
       ? productOptions.find((option) => {
+          if (option.allow_online_order === false) return false;
           const title = option.title?.trim().toLowerCase() ?? "";
           const matchValue = trimmed.toLowerCase();
           return (
@@ -831,7 +832,7 @@ const uploadFilesForProduct = async (index: number, tasks: UploadTask[]) => {
         const previewId = batch[idx].previewId;
         if (result.status === "fulfilled") {
           const key = result.value;
-          const publicUrl = `${UPLOADS_BASE}/${key}`;
+          const publicUrl = `${FILE_BASE}/${key}`;
           successfulKeys.push(key);
           updates[previewId] = {
             status: batch[idx].isDuplicate ? "duplicate" : "ready",
@@ -1320,7 +1321,7 @@ const handlePhotoCopiesChange = (index: number, previewId: string, value: number
                   disabled={loadingProducts && productOptions.length === 0}
                 />
                 <datalist id={`product-options-${index}`}>
-                  {productOptions.map((option) => {
+                  {productOptions.filter((option) => option.allow_online_order !== false).map((option) => {
                     const limitShort = formatImageLimitShort(
                       option.min_images ?? null,
                       option.max_images ?? null
@@ -1331,7 +1332,6 @@ const handlePhotoCopiesChange = (index: number, previewId: string, value: number
                       option.current_price,
                       limitShort ? limitShort : "",
                       pricingLabel ? pricingLabel : "",
-                      option.allow_online_order === false ? "Chỉ Zalo" : "",
                     ].filter(Boolean);
                     return (
                       <option

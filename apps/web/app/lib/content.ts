@@ -48,7 +48,12 @@ export type ProductDetail = {
   pricing_mode?: "combo" | "retail";
   min_images?: number | null;
   max_images?: number | null;
+  extra_options?: string[];
   is_active?: boolean;
+  tags?: string[];
+  seo_title?: string;
+  seo_description?: string;
+  focus_keyword?: string;
 };
 
 export type Banner = {
@@ -70,6 +75,8 @@ export type SiteSetting = {
   upload_max_files?: number | null;
   upload_max_bytes?: number | null;
   upload_require_verified_phone_threshold?: number | null;
+  login_phone_enabled?: boolean;
+  login_google_enabled?: boolean;
 };
 
 export type DynamicPage = {
@@ -78,4 +85,38 @@ export type DynamicPage = {
   title: string;
   summary: string;
   content: string;
+};
+
+export type Post = {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  content: string;
+  cover_image: string | null;
+  is_published: boolean;
+  tags: string[];
+  order: number;
+  created_at: string | null;
+  updated_at: string | null;
+  seo_title?: string;
+  seo_description?: string;
+  focus_keyword?: string;
+};
+
+export type ReviewItem = {
+  id: string;
+  product_slug: string;
+  rating: number;
+  body: string;
+  reviewer_name: string;
+  is_approved: boolean;
+  created_at: string | null;
+};
+
+export type ReviewStats = {
+  product_slug: string;
+  average_rating: number;
+  review_count: number;
+  reviews: ReviewItem[];
 };

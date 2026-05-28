@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { ChangeEvent, FormEvent, Dispatch, SetStateAction } from "react";
 
 import AdminModal from "../AdminModal";
+import TagInput from "../TagInput";
 import { shouldSkipImageOptimization } from "../../lib/image";
 import type { CategoryRecord, ProductUpsert } from "../types";
 
@@ -431,6 +432,70 @@ export default function ProductFormModal({
               }
             />
             Cho phép đặt hàng online
+          </label>
+        </div>
+
+        {/* SEO */}
+        <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-stone-400">SEO</p>
+
+          <div className="grid gap-1 text-sm font-semibold text-stone-700">
+            Tags
+            <TagInput
+              tags={form.tags ?? []}
+              onChange={(next) => onFormChange((prev) => ({ ...prev, tags: next }))}
+              placeholder="canvas, in ảnh, khổ a4..."
+              maxTags={20}
+            />
+            <span className="text-[11px] font-normal text-stone-400">
+              Tags được dùng làm từ khóa SEO (keywords) và hiển thị trên trang sản phẩm.
+            </span>
+          </div>
+
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            <div className="flex justify-between">
+              <span>Tiêu đề SEO</span>
+              <span className={`text-xs font-normal ${(form.seo_title?.length ?? 0) > 60 ? "text-amber-600" : "text-stone-400"}`}>
+                {form.seo_title?.length ?? 0}/70
+              </span>
+            </div>
+            <input
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm font-normal"
+              placeholder={`${form.name || "Tên sản phẩm"} | In ảnh 24h`}
+              value={form.seo_title ?? ""}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, seo_title: e.target.value }))}
+              maxLength={70}
+            />
+            <span className="text-[11px] font-normal text-stone-400">Để trống sẽ dùng tên sản phẩm. Lý tưởng: 50–60 ký tự.</span>
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            <div className="flex justify-between">
+              <span>Mô tả SEO</span>
+              <span className={`text-xs font-normal ${(form.seo_description?.length ?? 0) > 155 ? "text-amber-600" : "text-stone-400"}`}>
+                {form.seo_description?.length ?? 0}/160
+              </span>
+            </div>
+            <textarea
+              className="min-h-16 rounded-xl border border-stone-300 px-3 py-2 text-sm font-normal"
+              placeholder="Mô tả ngắn xuất hiện trên Google..."
+              value={form.seo_description ?? ""}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, seo_description: e.target.value }))}
+              maxLength={160}
+            />
+            <span className="text-[11px] font-normal text-stone-400">Để trống sẽ dùng mô tả sản phẩm. Lý tưởng: 120–155 ký tự.</span>
+          </label>
+
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            Từ khóa trọng tâm
+            <input
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm font-normal"
+              placeholder="vd: in ảnh canvas giá rẻ"
+              value={form.focus_keyword ?? ""}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, focus_keyword: e.target.value }))}
+              maxLength={100}
+            />
+            <span className="text-[11px] font-normal text-stone-400">Từ khóa chính cần có trong tiêu đề và mô tả sản phẩm.</span>
           </label>
         </div>
       </form>

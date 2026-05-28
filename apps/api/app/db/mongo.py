@@ -76,6 +76,14 @@ async def ensure_indexes(db: AsyncIOMotorDatabase | None = None) -> None:
     )
     await _create_index_safe(database["upload_sessions"], "expires_at", expireAfterSeconds=0, name="ttl_upload_sessions")
     await _create_index_safe(database["product_views"], "id", unique=True, sparse=True, name="uniq_product_view_id")
+    await _create_index_safe(database["posts"], "slug", unique=True, name="uniq_post_slug")
+    await _create_index_safe(database["posts"], [("is_published", 1), ("order", 1)], name="idx_post_published_order")
+    await _create_index_safe(database["product_reviews"], "product_slug", name="idx_review_product_slug")
+    await _create_index_safe(
+        database["product_reviews"],
+        [("product_slug", 1), ("is_approved", 1)],
+        name="idx_review_slug_approved",
+    )
 
 
 async def ping_database(db: AsyncIOMotorDatabase | None = None) -> None:

@@ -56,9 +56,19 @@ class Settings(BaseSettings):
     @classmethod
     def parse_origins(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, list):
-            return value
+            return [str(item).strip() for item in value if str(item).strip()]
         if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
+            stripped = value.strip()
+            # Handle JSON array format: ["url1","url2"]
+            if stripped.startswith("["):
+                import json
+                try:
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            return [item.strip() for item in stripped.split(",") if item.strip()]
         raise ValueError("cors_allow_origins must be a comma-separated string or list.")
 
     model_config = SettingsConfigDict(env_file=(ROOT_ENV_FILE, ".env"), env_file_encoding="utf-8", extra="ignore")

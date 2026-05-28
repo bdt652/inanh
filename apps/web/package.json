@@ -19,6 +19,7 @@
     "@tiptap/extension-underline": "^3.19.0",
     "@tiptap/react": "^3.19.0",
     "@tiptap/starter-kit": "^3.19.0",
+    "framer-motion": "^12.40.0",
     "next": "16.1.6",
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",
@@ -28,12 +29,24 @@
     "react-quill": "^2.0.0",
     "sanitize-html": "^2.12.1"
   },
+  "browserslist": [
+    "chrome >= 90",
+    "edge >= 90",
+    "firefox >= 88",
+    "safari >= 14",
+    "ios_saf >= 14",
+    "samsung >= 13",
+    "not dead"
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp", "unrs-resolver"]
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/sanitize-html": "^2.11.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.11.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
