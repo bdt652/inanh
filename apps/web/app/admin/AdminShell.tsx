@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Tổng quan" },
+  { href: "/admin/ai-tro-ly", label: "✨ AI Trợ lý" },
   { href: "/admin/pages", label: "Pages" },
   { href: "/admin/tin-tuc", label: "Tin tức" },
   { href: "/admin/menu", label: "Menu" },

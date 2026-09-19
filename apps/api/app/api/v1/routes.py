@@ -12,6 +12,7 @@ from app.api.v1.orders import router as orders_router
 from app.api.v1.drafts import router as drafts_router
 from app.api.v1.uploads import router as uploads_router
 from app.api.v1.users import router as users_router
+from app.api.v1.ai_assistant import router as ai_assistant_router
 from app.api.v1.schemas import (
     AdminBootstrapRequest,
     AdminLoginRequest,
@@ -44,6 +45,7 @@ router.include_router(users_router)
 router.include_router(drafts_router)
 router.include_router(orders_router)
 router.include_router(uploads_router)
+router.include_router(ai_assistant_router)
 
 
 def _normalize_page_path(raw_path: str) -> str:

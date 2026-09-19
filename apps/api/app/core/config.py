@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     minio_secure: bool = False
     minio_public_base_url: str | None = None  # e.g., https://media.inanh24h.com
     cors_allow_origins: List[str] = ["http://localhost:3000", "https://inanh24h.com", "https://www.inanh24h.com"]
+    ai_base_url: str = "http://localhost:20128/v1"
+    ai_api_key: str = ""
+    ai_model: str = "cc/claude-sonnet-4-6"
 
     @field_validator("storage_backend")
     @classmethod

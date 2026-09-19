@@ -209,35 +209,19 @@ async def _assert_image_limits(payloads: list[OrderProductPayload], db: AsyncIOM
             if max_limit is None and min_limit is not None:
                 max_limit = min_limit
         count = copies_count
-        unit = "b?n in"
-
-        if min_limit is not None and min_limit > 0 and count < min_limit:
-            label = item.name.strip() or "S?n ph?m"
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{label} c?n t?i thi?u {min_limit} {unit}.",
-            )
-        if max_limit is not None and max_limit > 0 and count > max_limit:
-            label = item.name.strip() or "S?n ph?m"
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{label} v??t qu? t?i ?a {max_limit} {unit}.",
-            )
-
-        min_limit = doc.get("min_images") if doc and doc.get("min_images") is not None else None
-        max_limit = doc.get("max_images") if doc and doc.get("max_images") is not None else None
+        unit = "bản in"
 
         if min_limit is not None and min_limit > 0 and count < min_limit:
             label = item.name.strip() or "Sản phẩm"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{label} cần tối thiểu {min_limit} ảnh.",
+                detail=f"{label} cần tối thiểu {min_limit} {unit}.",
             )
         if max_limit is not None and max_limit > 0 and count > max_limit:
             label = item.name.strip() or "Sản phẩm"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{label} vượt quá tối đa {max_limit} ảnh.",
+                detail=f"{label} vượt quá tối đa {max_limit} {unit}.",
             )
 
 

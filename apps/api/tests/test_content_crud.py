@@ -233,7 +233,7 @@ def test_content_image_upload_success_and_validation_failure() -> None:
         uploaded = client.post(
             "/api/v1/content/uploads/images",
             content=_make_png_image(),
-            headers={**headers, "Content-Type": "image/png", "X-File-Name": "banner.png"},
+            headers={**headers, "Content-Type": "image/png", "X-File-Name": "banner.png", "X-Image-Purpose": "banner"},
         )
         assert uploaded.status_code == 201
         payload = uploaded.json()
