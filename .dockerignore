@@ -3,6 +3,9 @@ node_modules
 .next
 .git
 .gitignore
+.env
+.env.*
+!.env.example
 *.log
 apps/api/.venv
 apps/api/__pycache__

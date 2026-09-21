@@ -21,7 +21,7 @@ services:
           - media.inanh24h.com
 
   api:
-    image: registry.nextgentra.com/inanh24h/api:latest
+    image: docker.io/bdt652/inanh:api
     restart: unless-stopped
     env_file: .env
     environment:
@@ -41,7 +41,7 @@ services:
       - api-uploads:/app/app/uploads
 
   web:
-    image: registry.nextgentra.com/inanh24h/web:latest
+    image: docker.io/bdt652/inanh:web
     restart: unless-stopped
     env_file: .env
     environment:

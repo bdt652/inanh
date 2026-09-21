@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inanh24h-api-config
+  namespace: inanh24h
+data:
+  DB_NAME: "inanh24h"
+  STORAGE_BACKEND: "minio"
+  MINIO_ENDPOINT: "http://192.168.53.105:9000"
+  MINIO_BUCKET_NAME: "inanh24h-media"
+  MINIO_SECURE: "false"
+  MINIO_PUBLIC_BASE_URL: "https://media.inanh24h.com/inanh24h-media"
+  AI_MODEL: "cc/agentgw.cloud"
+  AI_BASE_URL: "http://192.168.53.106:20128/v1"
+  PHONE_OTP_DEBUG: "false"
+  PHONE_OTP_TTL_SECONDS: "300"
+  UPLOAD_MIN_FILES: "1"
+  UPLOAD_MAX_FILES: "10000"
+  ADMIN_TOKEN_TTL_SECONDS: "86400"
+  CUSTOMER_TOKEN_TTL_SECONDS: "604800"
+  CORS_ALLOW_ORIGINS: '["https://inanh24h.com","https://www.inanh24h.com","https://api.inanh24h.com","http://localhost:3000"]'
