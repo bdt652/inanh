@@ -95,7 +95,13 @@ jobs:
             --docker-password=${{ secrets.DOCKERHUB_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
       - name: Apply manifests
-        run: kubectl apply -f deploy/k8s/
+        # NOTE: 01-secrets.yaml is excluded on purpose. The secret holds real
+        # credentials (MongoDB/MinIO/AI keys) and must be created manually on the
+        # cluster once (kubectl create secret ...). CI never applies placeholders.
+        run: |
+          for f in deploy/k8s/00-namespace.yaml deploy/k8s/02-configmap-api.yaml deploy/k8s/03-configmap-web.yaml deploy/k8s/10-api-deployment.yaml deploy/k8s/11-api-service.yaml deploy/k8s/20-web-deployment.yaml deploy/k8s/21-web-service.yaml deploy/k8s/30-cert-issuer.yaml deploy/k8s/31-ingress-api.yaml deploy/k8s/32-ingress-web.yaml; do
+            kubectl apply -f "$f"
+          done
       - name: Update images
         run: |
           kubectl -n ${{ env.K8S_NAMESPACE }} set image deployment/api api=${{ env.REGISTRY_IMAGE }}:api-${{ github.sha }}
