@@ -74,8 +74,16 @@ EOF
 sleep 3
 TOKEN=$(kubectl -n "$NS" get secret "$SA-token" -o jsonpath='{.data.token}' | base64 -d)
 CA=$(kubectl -n "$NS" get secret "$SA-token" -o jsonpath='{.data.ca\.crt}')
-# Lấy server endpoint từ kubeconfig hiện tại
-SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+# Lấy server endpoint từ kubeconfig hiện tại, nhưng THAY thế tên DNS nội bộ
+# (k8s-api / localhost) bằng INTERNAL IP của node để GitHub Actions ở ngoài connect được.
+RAW_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+if [ -n "${NODE_IP:-}" ]; then
+  SERVER=$(echo "$RAW_SERVER" | sed -E "s#https://[^:/]+:#https://${NODE_IP}:#")
+else
+  SERVER="$RAW_SERVER"
+fi
+echo "CI se connect qua: $SERVER"
 
 cat > /tmp/ci-kubeconfig <<EOF
 apiVersion: v1
