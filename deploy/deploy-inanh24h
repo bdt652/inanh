@@ -21,6 +21,24 @@ IMAGE=docker.io/bdt652/inanh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_DIR="${MANIFEST_DIR:-/opt/inanh/deploy/k8s}"
 
+# The self-hosted runner (github-runner) has no kubeconfig of its own.
+# The script runs via 'sudo' as root, so it can use root's kubeconfig.
+# Locate it automatically; override with KUBECONFIG env if needed.
+if [ -z "${KUBECONFIG:-}" ]; then
+  for candidate in /etc/rancher/k3s/k3s.yaml /root/.kube/config "$HOME/.kube/config"; do
+    if [ -f "$candidate" ]; then
+      export KUBECONFIG="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "${KUBECONFIG:-}" ]; then
+  echo "ERROR: no kubeconfig found for root (tried /etc/rancher/k3s/k3s.yaml, /root/.kube/config, \$HOME/.kube/config)" >&2
+  exit 1
+fi
+echo "==> Using kubeconfig: $KUBECONFIG"
+
 usage() {
   echo "Usage: $0 <api|web> <git-sha>" >&2
   exit 1
@@ -39,6 +57,12 @@ TAG="${SVC}-${SHA}"
 FULL_IMAGE="${IMAGE}:${TAG}"
 
 echo "==> Deploying $SVC with image $FULL_IMAGE (namespace $NS)"
+
+# verify cluster reachable
+if ! kubectl -n "$NS" get ns "$NS" >/dev/null 2>&1; then
+  echo "ERROR: cannot reach namespace $NS — check kubeconfig ($KUBECONFIG)" >&2
+  exit 1
+fi
 
 # 1. Apply manifests (trừ secret placeholder)
 if [ -d "$MANIFEST_DIR" ]; then
