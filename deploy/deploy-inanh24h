@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# =====================================================================
+# /usr/local/sbin/deploy-inanh24h — chạy TRÊN MÁY 108 (self-hosted runner)
+#
+# Được gọi bởi GitHub Actions:
+#   deploy-inanh24h api <git-sha>
+#   deploy-inanh24h web <git-sha>
+#
+# Làm:
+#   1) kubectl set image deployment/<svc> <svc>=docker.io/bdt652/inanh:<svc>-<sha>
+#   2) apply lại các manifest (ngoại trừ 01-secrets.yaml — chứa placeholder)
+#   3) rollout status
+#
+# Yêu cầu: kubectl đã cấu hình context mặc định trỏ vào cluster này,
+# và runner có quyền sudo NOPASSWD gọi script này.
+# =====================================================================
+set -euo pipefail
+
+NS=inanh24h
+IMAGE=docker.io/bdt652/inanh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MANIFEST_DIR="${MANIFEST_DIR:-/opt/inanh/deploy/k8s}"
+
+usage() {
+  echo "Usage: $0 <api|web> <git-sha>" >&2
+  exit 1
+}
+
+[ "$#" -eq 2 ] || usage
+SVC="$1"
+SHA="$2"
+
+case "$SVC" in
+  api|web) ;;
+  *) usage ;;
+esac
+
+TAG="${SVC}-${SHA}"
+FULL_IMAGE="${IMAGE}:${TAG}"
+
+echo "==> Deploying $SVC with image $FULL_IMAGE (namespace $NS)"
+
+# 1. Apply manifests (trừ secret placeholder)
+if [ -d "$MANIFEST_DIR" ]; then
+  echo "==> Applying manifests from $MANIFEST_DIR (excluding 01-secrets.yaml)"
+  for f in "$MANIFEST_DIR"/*.yaml; do
+    base="$(basename "$f")"
+    if [ "$base" = "01-secrets.yaml" ]; then
+      echo "    skip $base (placeholder secret)"
+      continue
+    fi
+    kubectl apply -f "$f"
+  done
+else
+  echo "WARN: manifest dir $MANIFEST_DIR not found; skipping apply" >&2
+fi
+
+# 2. Set image
+kubectl -n "$NS" set image "deployment/${SVC}" "${SVC}=${FULL_IMAGE}"
+
+# 3. Rollout
+kubectl -n "$NS" rollout status "deployment/${SVC}" --timeout=180s
+
+echo "==> Done: $SVC -> $FULL_IMAGE"

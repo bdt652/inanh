@@ -1,90 +1,73 @@
-# Thiết lập CI/CD (GitHub Actions → k3s máy 108)
+# Thiết lập CI/CD (GitHub Actions self-hosted runner → k3s máy 108)
 
-Pipeline: `push main` → pytest → build+push image Docker Hub private → `kubectl apply` lên cluster.
+Pipeline: `push main` → pytest → build+push image Docker Hub private → self-hosted
+runner trên máy 108 gọi `deploy-inanh24h` để `kubectl` deploy.
 
-## 1. Trên máy 108 (k8s-main) — chạy một lần
+## Ưu điểm của thiết kế này
+- Không cần đưa kubeconfig/admin token ra ngoài GitHub (runner chạy ngay trên cluster).
+- Runner đã có kubectl + context → deploy trực tiếp.
 
+## 1. Trên máy 108 — chạy MỘT LẦN (chuẩn bị)
+
+### 1a. Tạo namespace + secret thật
 ```bash
 cd /opt/inanh
 git pull
+source .env                # nạp MONGODB_URI, ADMIN_TOKEN_SECRET, ...
 bash deploy/setup-cluster.sh
 ```
+Script tạo namespace `inanh24h`, Secret `inanh24h-secrets` từ `.env`.
+(ServiceAccount trong script không còn bắt buộc vì dùng self-hosted runner,
+nhưng vô hại — có thể bỏ qua phần kubeconfig base64.)
 
-Script sẽ:
-- Tạo namespace `inanh24h`
-- Tạo ServiceAccount `github-actions-deployer` + Role giới hạn quyền deploy
-- Sinh `/tmp/ci-kubeconfig` và **in ra chuỗi base64** → dùng cho GitHub Secret `KUBE_CONFIG`
-- Đọc biến từ `.env` (phải `source .env` trước) để tạo Secret `inanh24h-secrets`
-
-> LUU Y: `deploy/setup-cluster.sh` yêu cầu bạn đã `source /opt/inanh/.env` (hoặc export các biến)
-> trước khi chạy, nếu không secret sẽ chứa giá trị `CHANGEME`.
-
-### Neu chua cai Traefik / cert-manager (bat buoc cho Ingress TLS)
-
+### 1b. Cài Traefik + cert-manager (BẮT BUỘC cho Ingress TLS)
 ```bash
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-
-helm repo add traefik https://traefik.github.io/charts
-helm repo update
+helm repo add traefik https://traefik.github.io/charts && helm repo update
 helm install traefik traefik/traefik -n traefik --create-namespace \
   --set ports.web.hostPort=80 --set ports.websecure.hostPort=443 \
   --set service.type=ClusterIP --set hostNetwork=true \
   --set securityContext.seccompProfile.type=RuntimeDefault
+curl -I http://192.168.53.108   # Traefik 404 = ok
 ```
 
-Kiem tra: `curl -I http://192.168.53.108` → Traefik 404.
+### 1c. Đặt script deploy + quyền sudo NOPASSWD
+```bash
+sudo cp /opt/inanh/deploy/deploy-inanh24h /usr/local/sbin/deploy-inanh24h
+sudo chmod 755 /usr/local/sbin/deploy-inanh24h
+# Cho phép runner gọi script không cần password:
+echo "runneruser ALL=(ALL) NOPASSWD: /usr/local/sbin/deploy-inanh24h" | sudo tee /etc/sudoers.d/deploy-inanh24h
+```
 
-## 2. DNS
+## 2. Đăng ký self-hosted runner trên máy 108
+GitHub repo → Settings → Actions → Runners → New self-hosted runner (Linux x64).
+Làm theo hướng dẫn: chạy lệnh `./config.sh` với `--labels inanh24h` và
+`./run.sh` (hoặc cài systemd service để tự chạy). Runner phải có label `inanh24h`
+(khớp với `runs-on` trong workflow).
 
-Tro 2 A record → IP node `192.168.53.108`:
-- `inanh24h.com`
-- `api.inanh24h.com`
+Runner cần: `docker`, `kubectl` (context mặc định trỏ cluster), và có quyền
+sudo gọi `deploy-inanh24h`.
 
-## 3. Trên GitHub — repo bdt652/inanh → Settings → Secrets and variables → Actions
-
-**Repository Secrets:**
+## 3. GitHub Secrets
 | Name | Value |
 |------|-------|
-| `DOCKERHUB_USERNAME` | ten user Docker Hub (vd: bdt652) |
-| `DOCKERHUB_TOKEN` | Docker Hub Access Token (khong dung password) |
-| `KUBE_CONFIG` | chuoi base64 in ra tu setup-cluster.sh (buoc 1) |
+| `DOCKERHUB_USERNAME` | `bdt652` |
+| `DOCKERHUB_TOKEN` | Docker Hub Access Token |
 
-**Repository Variables (tuy chon — co default san trong workflow):**
-| Name | Default |
-|------|---------|
-| `NEXT_PUBLIC_API_URL` | `https://api.inanh24h.com/api/v1` |
-| `NEXT_PUBLIC_BACKEND_URL` | `https://api.inanh24h.com` |
-| `NEXT_PUBLIC_SITE_URL` | `https://inanh24h.com` |
-| `NEXT_PUBLIC_UPLOAD_MODE` | `presigned` |
-| `NEXT_PUBLIC_MINIO_PUBLIC_BASE_URL` | `https://media.inanh24h.com/inanh24h-media` |
-| `API_INTERNAL_URL` | `http://api:8000/api/v1` |
+(Không cần `KUBE_CONFIG` vì runner chạy trên cluster.)
 
-## 4. Kiem tra lan dau (truoc khi CI tu chay)
+## 4. DNS
+Trỏ `inanh24h.com` + `api.inanh24h.com` → `192.168.53.108`.
 
+## 5. Test
+Push 1 commit lên `main` → tab Actions: job test (pytest) → build (push image) →
+deploy (runner gọi deploy-inanh24h). Kiểm tra:
 ```bash
-kubectl apply -f deploy/k8s/00-namespace.yaml
-kubectl apply -f deploy/k8s/02-configmap-api.yaml deploy/k8s/03-configmap-web.yaml
-kubectl apply -f deploy/k8s/10-api-deployment.yaml deploy/k8s/11-api-service.yaml
-kubectl apply -f deploy/k8s/20-web-deployment.yaml deploy/k8s/21-web-service.yaml
-kubectl apply -f deploy/k8s/30-cert-issuer.yaml deploy/k8s/31-ingress-api.yaml deploy/k8s/32-ingress-web.yaml
 kubectl -n inanh24h get pods
+curl -I https://api.inanh24h.com/health
+curl -I https://inanh24h.com/
 ```
 
-## 5. Luu y bao mat
-
-- `01-secrets.yaml` CO CHUA PLACEHOLDER `CHANGEME` → bi KHONG commit secret that, va CI KHONG apply file nay.
-- Secret that duoc tao thu cong qua `setup-cluster.sh` (hoac `kubectl create secret`).
-- Image Docker Hub de PRIVATE de nguoi khac khong lay duoc source tu layer.
-- `deploy/setup-cluster.sh` tao ServiceAccount rieng (khong dung admin kubeconfig) → quyen gioi han.
-
-## 6. Luu y Let's Encrypt
-
-`30-cert-issuer.yaml` dang dung STAGING (tranh rate-limit). Khi moi thu on dinh, sua:
-```
-server: https://acme-v02.api.letsencrypt.org/directory
-```
-va xoa Certificate cu de cap lai:
-```
-kubectl -n inanh24h delete certificate api-inanh24h-tls inanh24h-tls
-kubectl apply -f deploy/k8s/30-cert-issuer.yaml deploy/k8s/31-ingress-api.yaml deploy/k8s/32-ingress-web.yaml
-```
+## Lưu ý Let's Encrypt
+`30-cert-issuer.yaml` đang dùng STAGING. Khi ổn định, đổi thành production:
+`server: https://acme-v02.api.letsencrypt.org/directory` và xóa Certificate cũ để cấp lại.
