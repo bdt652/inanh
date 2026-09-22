@@ -31,7 +31,15 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Run pytest
+      # app.main imports Settings(), which requires admin_token_secret (no default).
+      # Tests use a FakeDB so MONGODB_URI need not be real, but the field must exist.
+      - name: Provide required settings for import
+        env:
+          ADMIN_TOKEN_SECRET: ${{ secrets.ADMIN_TOKEN_SECRET }}
+          ADMIN_BOOTSTRAP_SECRET: ${{ secrets.ADMIN_BOOTSTRAP_SECRET }}
+          CUSTOMER_TOKEN_SECRET: ${{ secrets.CUSTOMER_TOKEN_SECRET }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          DB_NAME: inanh24h
         run: python -m pytest -v
 
   build:
