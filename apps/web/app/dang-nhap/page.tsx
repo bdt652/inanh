@@ -14,19 +14,18 @@ export const metadata: Metadata = {
 };
 
 export default async function LoginPage() {
-  let loginPhoneEnabled = true;
   let loginGoogleEnabled = true;
   try {
     const settings = await getSiteSettings();
-    loginPhoneEnabled = settings?.login_phone_enabled ?? true;
     loginGoogleEnabled = settings?.login_google_enabled ?? true;
   } catch {
-    // fallback: both enabled
+    // fallback: enabled
   }
 
+  // Phone/email login is always available (not toggled by settings).
   return (
     <Suspense fallback={<div className="min-h-screen w-full bg-[var(--surface-soft,#f8f3eb)]" />}>
-      <LoginClient loginPhoneEnabled={loginPhoneEnabled} loginGoogleEnabled={loginGoogleEnabled} />
+      <LoginClient loginPhoneEnabled={true} loginGoogleEnabled={loginGoogleEnabled} />
     </Suspense>
   );
 }

@@ -79,7 +79,7 @@ export default function LoginClient({ loginPhoneEnabled = true, loginGoogleEnabl
     const cleanedPhone = phone.trim();
     const cleanedPassword = password.trim();
     if (!cleanedPhone || !cleanedPassword) {
-      setError("Vui lòng nhập số điện thoại và mật khẩu.");
+      setError("Vui lòng nhập số điện thoại/email và mật khẩu.");
       return;
     }
 
@@ -213,12 +213,13 @@ export default function LoginClient({ loginPhoneEnabled = true, loginGoogleEnabl
               }}
             >
               <label className="grid gap-1 text-sm font-semibold text-[var(--text-soft,#4a4034)]">
-                Số điện thoại
+                Số điện thoại hoặc email
                 <input
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
-                  placeholder="09xx..."
-                  inputMode="tel"
+                  placeholder="09xx... hoặc you@email.com"
+                  inputMode="email"
+                  autoComplete="username"
                   className="rounded-2xl border border-stone-300 px-3 py-2 text-sm shadow-inner transition focus:border-[var(--accent,#b46a2f)] focus:outline-none"
                 />
               </label>

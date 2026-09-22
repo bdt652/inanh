@@ -108,16 +108,23 @@ async def register_user(payload: UserRegisterRequest, db: AsyncIOMotorDatabase =
 
 @router.post("/login", response_model=UserTokenResponse)
 async def login_user(payload: UserLoginRequest, db: AsyncIOMotorDatabase = Depends(get_db)) -> UserTokenResponse:
-    phone = payload.phone.strip()
-    user = await db["users"].find_one({"phone": phone, "is_active": {"$ne": False}})
+    identifier = payload.phone.strip()
+    # Allow login by phone OR email.
+    user = await db["users"].find_one({
+        "$or": [
+            {"phone": identifier, "is_active": {"$ne": False}},
+            {"email": identifier, "is_active": {"$ne": False}},
+        ]
+    })
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sai thông tin đăng nhập.")
     if not verify_password(payload.password, user.get("password_salt", ""), user.get("password_hash", "")):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sai thông tin đăng nhập.")
-    token = await _issue_token(phone)
+    resolved_phone = user.get("phone") or identifier
+    token = await _issue_token(resolved_phone)
     token.phone_verified = bool(user.get("phone_verified"))
     if settings.phone_otp_debug and not user.get("phone_verified"):
-        otp_doc = await db["phone_otps"].find_one({"phone": phone, "consumed": False})
+        otp_doc = await db["phone_otps"].find_one({"phone": resolved_phone, "consumed": False})
         if otp_doc and otp_doc.get("expires_at") and otp_doc["expires_at"] > _now():
             token.debug_otp = "***"
     return token
