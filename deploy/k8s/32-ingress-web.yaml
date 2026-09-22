@@ -12,64 +12,39 @@ spec:
     name: letsencrypt-inanh24h
     kind: ClusterIssuer
 ---
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: inanh24h-www-redirect
-  namespace: inanh24h
-spec:
-  entryPoints:
-    - websecure
-  routes:
-    - match: Host(`www.inanh24h.com`)
-      kind: Rule
-      services:
-        - name: web
-          port: 3000
-  tls:
-    secretName: inanh24h-tls
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
   name: inanh24h
   namespace: inanh24h
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/from-to-www-redirect: "true"
 spec:
-  entryPoints:
-    - websecure
-  routes:
-    - match: Host(`inanh24h.com`)
-      kind: Rule
-      services:
-        - name: web
-          port: 3000
+  ingressClassName: nginx
   tls:
-    secretName: inanh24h-tls
----
-# Redirect plain HTTP -> HTTPS via Traefik middleware
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: redirect-https
-  namespace: inanh24h
-spec:
-  redirectScheme:
-    scheme: https
-    permanent: true
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: inanh24h-http
-  namespace: inanh24h
-spec:
-  entryPoints:
-    - web
-  routes:
-    - match: Host(`inanh24h.com`) || Host(`www.inanh24h.com`) || Host(`api.inanh24h.com`)
-      kind: Rule
-      middlewares:
-        - name: redirect-https
-      services:
-        - name: web
-          port: 3000
+    - hosts:
+        - inanh24h.com
+        - www.inanh24h.com
+      secretName: inanh24h-tls
+  rules:
+    - host: inanh24h.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 3000
+    - host: www.inanh24h.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 3000

@@ -20,15 +20,16 @@ Script tạo namespace `inanh24h`, Secret `inanh24h-secrets` từ `.env`.
 (ServiceAccount trong script không còn bắt buộc vì dùng self-hosted runner,
 nhưng vô hại — có thể bỏ qua phần kubeconfig base64.)
 
-### 1b. Cài Traefik + cert-manager (BẮT BUỘC cho Ingress TLS)
+### 1b. Ingress (đã có sẵn — KHÔNG cài thêm)
+Máy 108 dùng **kubeadm + ingress-nginx + cert-manager** (đã chạy). KHÔNG cài Traefik.
+Public vào qua **Cloudflare Tunnel trên máy 100** → NodePort `30721` (web) / `31749` (api) → ingress-nginx.
+Manifest `31/32` dùng chuẩn `Ingress` + `ingressClassName: nginx` + TLS qua cert-manager.
+
+Kiểm tra stack hiện tại:
 ```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-helm repo add traefik https://traefik.github.io/charts && helm repo update
-helm install traefik traefik/traefik -n traefik --create-namespace \
-  --set ports.web.hostPort=80 --set ports.websecure.hostPort=443 \
-  --set service.type=ClusterIP --set hostNetwork=true \
-  --set securityContext.seccompProfile.type=RuntimeDefault
-curl -I http://192.168.53.108   # Traefik 404 = ok
+kubectl get pods -n ingress-nginx
+kubectl get pods -n cert-manager
+kubectl get ingressclass    # phải có: nginx
 ```
 
 ### 1c. Đặt script deploy + quyền sudo NOPASSWD
@@ -56,8 +57,10 @@ sudo gọi `deploy-inanh24h`.
 
 (Không cần `KUBE_CONFIG` vì runner chạy trên cluster.)
 
-## 4. DNS
-Trỏ `inanh24h.com` + `api.inanh24h.com` → `192.168.53.108`.
+## 4. DNS / Public access
+KHÔNG đổi DNS. Public vào cluster qua Cloudflare Tunnel trên máy 100
+→ NodePort `30721` (web) / `31749` (api) → ingress-nginx.
+Đảm bảo Cloudflare Tunnel đang chạy và trỏ đúng 2 NodePort này.
 
 ## 5. Test
 Push 1 commit lên `main` → tab Actions: job test (pytest) → build (push image) →

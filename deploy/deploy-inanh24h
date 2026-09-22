@@ -24,18 +24,18 @@ MANIFEST_DIR="${MANIFEST_DIR:-/opt/inanh/deploy/k8s}"
 # The self-hosted runner (github-runner) has no kubeconfig of its own.
 # The script runs via 'sudo' as root, so it can use root's kubeconfig.
 # Locate it automatically; override with KUBECONFIG env if needed.
+# Machine 108 is kubeadm: prefer /etc/kubernetes/admin.conf.
 if [ -z "${KUBECONFIG:-}" ]; then
-  for candidate in /etc/rancher/k3s/k3s.yaml /root/.kube/config "$HOME/.kube/config"; do
-    if [ -f "$candidate" ]; then
-      export KUBECONFIG="$candidate"
-      break
-    fi
-  done
-fi
-
-if [ -z "${KUBECONFIG:-}" ]; then
-  echo "ERROR: no kubeconfig found for root (tried /etc/rancher/k3s/k3s.yaml, /root/.kube/config, \$HOME/.kube/config)" >&2
-  exit 1
+  if [ -f /etc/kubernetes/admin.conf ]; then
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+  elif [ -f /root/.kube/config ]; then
+    export KUBECONFIG=/root/.kube/config
+  elif [ -f /etc/rancher/k3s/k3s.yaml ]; then
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+  else
+    echo "ERROR: no Kubernetes kubeconfig found (tried /etc/kubernetes/admin.conf, /root/.kube/config, /etc/rancher/k3s/k3s.yaml)" >&2
+    exit 1
+  fi
 fi
 echo "==> Using kubeconfig: $KUBECONFIG"
 
