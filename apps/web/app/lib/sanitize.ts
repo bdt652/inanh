@@ -39,7 +39,7 @@ const allowedTags = [
 
 const allowedAttributes: Record<string, string[]> = {
   a: ["href", "name", "target", "rel"],
-  img: ["src", "alt", "title", "width", "height", "loading", "style"],
+  img: ["src", "srcset", "sizes", "alt", "title", "width", "height", "loading", "style"],
   script: ["type"],
   style: ["type"],
   "*": ["class", "id", "style"],

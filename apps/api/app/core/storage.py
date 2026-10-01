@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 from io import BytesIO
 from pathlib import Path
 import shutil
@@ -17,6 +19,8 @@ except Exception:  # pragma: no cover - optional dependency in local test enviro
 
 from app.core.config import settings
 from app.core.uploads import ensure_uploads_dir
+
+logger = logging.getLogger(__name__)
 
 
 class StorageUnavailableError(RuntimeError):
@@ -72,8 +76,36 @@ def ensure_storage_ready() -> None:
         client = _build_minio_client()
         if not client.bucket_exists(settings.minio_bucket_name):
             client.make_bucket(settings.minio_bucket_name)
+        _ensure_public_read_policy(client)
+    except StorageUnavailableError:
+        raise
     except Exception as exc:
         raise StorageUnavailableError("Failed to initialize MinIO storage.") from exc
+
+
+def _public_read_policy(bucket_name: str) -> str:
+    """Read-only bucket policy so direct media URLs are publicly viewable."""
+    return json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": ["*"]},
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{bucket_name}/*"],
+                }
+            ],
+        }
+    )
+
+
+def _ensure_public_read_policy(client) -> None:
+    """Best-effort: allow public GET on objects so <img> URLs don't 403."""
+    try:
+        client.set_bucket_policy(settings.minio_bucket_name, _public_read_policy(settings.minio_bucket_name))
+    except Exception as exc:
+        logger.warning("Could not set public read policy on bucket %s: %s", settings.minio_bucket_name, exc)
 
 
 def store_object_bytes(object_path: str, data: bytes, content_type: str) -> None:

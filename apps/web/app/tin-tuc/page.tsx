@@ -8,6 +8,7 @@ import HeaderBar from "../components/HeaderBar";
 import { PageTransition, ScrollReveal } from "../components/motion";
 import ScrollProgress from "../components/ScrollProgress";
 import { getCategories, getMenuItems, getPublishedPosts, getSiteSettings } from "../lib/api";
+import { normalizeImageUrl, shouldSkipImageOptimization } from "../lib/image";
 import { buildBreadcrumbJsonLd, SITE_NAME, SITE_URL } from "../lib/seo";
 
 export const revalidate = 300;
@@ -99,11 +100,12 @@ export default async function TinTucPage() {
                     {post.cover_image && (
                       <div className="relative h-44 w-full overflow-hidden bg-[var(--surface)]">
                         <Image
-                          src={post.cover_image}
+                          src={normalizeImageUrl(post.cover_image)}
                           alt={post.title}
                           fill
                           sizes="(min-width: 1024px) 320px, (min-width: 640px) 50vw, 100vw"
                           className="object-cover transition duration-300 group-hover:scale-[1.03]"
+                          unoptimized={shouldSkipImageOptimization(post.cover_image)}
                         />
                       </div>
                     )}

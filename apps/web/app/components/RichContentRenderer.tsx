@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
+import { normalizeImageUrl } from "../lib/image";
+
 type Props = {
   html: string;
   className?: string;
@@ -21,6 +23,18 @@ function extractAssets(html: string): Extracted {
     scriptBlocks.push(c);
     return "";
   });
+
+  // Resolve storage-relative <img src> (e.g. "/uploads/..." or bare object
+  // keys) to absolute file URLs — CMS content saved them as-is.
+  clean = clean.replace(/<img\b[^>]*>/gi, (tag) =>
+    tag.replace(/\bsrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i, (attr, _raw, dquoted, squoted, bare) => {
+      const original = dquoted ?? squoted ?? bare ?? "";
+      const resolved = normalizeImageUrl(original);
+      if (resolved === original) return attr;
+      const quote = attr.includes('"') ? '"' : attr.includes("'") ? "'" : '"';
+      return `src=${quote}${resolved}${quote}`;
+    }),
+  );
 
   return { styleContent: styleBlocks.join("\n"), scriptBlocks, cleanHtml: clean };
 }

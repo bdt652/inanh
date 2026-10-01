@@ -91,6 +91,29 @@ async def create_session(
     )
 
 
+def _public_presigned_url(raw_url: str) -> str:
+    """Rewrite an internal MinIO presigned URL to the public host.
+
+    presigned_put_object() embeds the internal MINIO_ENDPOINT host, which the
+    browser cannot reach. Swap scheme+host for the public base (which already
+    includes the bucket path prefix) while keeping path/query/signature.
+    Falls back to the raw URL when no public base is configured.
+    """
+    public_base = (settings.minio_public_base_url or "").strip().rstrip("/")
+    if not public_base:
+        return raw_url
+    try:
+        from urllib.parse import urlparse, urlunparse
+
+        parsed = urlparse(raw_url)
+        public = urlparse(public_base)
+        if not parsed.scheme or not public.scheme or not public.netloc:
+            return raw_url
+        return urlunparse((public.scheme, public.netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+    except Exception:
+        return raw_url
+
+
 def _safe_object_key(user_id: str, session_id: str, filename: str) -> str:
     base = os.path.basename(filename).replace("\\", "_").replace("/", "_")
     random_prefix = uuid.uuid4().hex[:8]
@@ -183,11 +206,11 @@ async def presign_uploads(
     for item in payload.files:
         key = _safe_object_key(current_user["id"], session_id, item.filename)
         expires_dt = _now() + timedelta(minutes=10)
-        url = client.presigned_put_object(settings.minio_bucket_name, key, expires=timedelta(minutes=10))
+        raw_url = client.presigned_put_object(settings.minio_bucket_name, key, expires=timedelta(minutes=10))
         responses.append(
             UploadPresignResponseItem(
                 key=key,
-                url=url,
+                url=_public_presigned_url(raw_url),
                 expires_at=int(expires_dt.timestamp()),
                 content_type=item.content_type,
             )

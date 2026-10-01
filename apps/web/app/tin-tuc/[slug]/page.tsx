@@ -8,6 +8,7 @@ import HeaderBar from "../../components/HeaderBar";
 import { PageTransition, ScrollReveal } from "../../components/motion";
 import ScrollProgress from "../../components/ScrollProgress";
 import { getCategories, getMenuItems, getPostBySlug, getPublishedPosts, getSiteSettings } from "../../lib/api";
+import { normalizeImageUrl } from "../../lib/image";
 import { buildBreadcrumbJsonLd, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from "../../lib/seo";
 import RichContentRenderer from "../../components/RichContentRenderer";
 
@@ -38,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!post) return { title: "Không tìm thấy tin tức", robots: { index: false, follow: false } };
 
   const url = `${SITE_URL}/tin-tuc/${post.slug}.html`;
-  const image = post.cover_image ?? `${SITE_URL}${DEFAULT_OG_IMAGE}`;
+  const image = post.cover_image ? normalizeImageUrl(post.cover_image) : `${SITE_URL}${DEFAULT_OG_IMAGE}`;
 
   const metaTitle = post.seo_title?.trim() || post.title;
   const metaDesc = post.seo_description?.trim() || post.summary || undefined;
@@ -79,7 +80,7 @@ export default async function PostDetailPage({ params }: Props) {
     { name: post.title, url: `${SITE_URL}/tin-tuc/${post.slug}.html` },
   ]);
 
-  const image = post.cover_image ?? `${SITE_URL}${DEFAULT_OG_IMAGE}`;
+  const image = post.cover_image ? normalizeImageUrl(post.cover_image) : `${SITE_URL}${DEFAULT_OG_IMAGE}`;
   const articleJsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
