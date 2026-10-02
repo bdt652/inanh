@@ -398,6 +398,27 @@ export async function deletePost(token: string, id: string): Promise<void> {
   await request<void>(`/content/posts/${id}`, { method: "DELETE", token });
 }
 
+export type GeneratePostPayload = {
+  topic: string;
+  keywords?: string[];
+  tone?: string;
+};
+
+export type GeneratePostResult = {
+  post: PostUpsert;
+  cover_image: string | null;
+  image_count: number;
+  reply: string;
+};
+
+export async function generatePostByAi(token: string, payload: GeneratePostPayload): Promise<GeneratePostResult> {
+  return request<GeneratePostResult>("/admin/ai/generate-post", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
 // ── Reviews ──────────────────────────────────────────────────────────────────
 
 export async function createReview(

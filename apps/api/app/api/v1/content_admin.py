@@ -37,7 +37,7 @@ from app.api.v1.schemas import (
     UploadImageResponse,
 )
 from app.core.storage import StorageUnavailableError, store_object_bytes, store_object_stream
-from app.core.uploads import build_public_upload_url
+from app.core.uploads import build_object_url, build_public_upload_url
 from app.db.mongo import ensure_indexes, get_db
 
 router = APIRouter(tags=["content"], dependencies=[Depends(require_admin)])
@@ -455,6 +455,47 @@ async def upload_content_image(request: Request) -> UploadImageResponse:
         spool.close()
 
     return UploadImageResponse(url=build_public_upload_url(request, object_path))
+
+
+async def store_image_bytes(raw_bytes: bytes, content_type: str, purpose: str) -> str:
+    """Process + store raw image bytes and return its public URL.
+
+    Backend-only helper (used by AI image generation) that mirrors the
+    processing pipeline of upload_content_image but takes already-decoded
+    bytes instead of a streaming Request.
+    """
+    if not raw_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image payload.")
+
+    try:
+        with io.BytesIO(raw_bytes) as source:
+            processed_bytes, processed_content_type, extension, keep_original = await asyncio.to_thread(
+                _process_uploaded_image, source, content_type, purpose
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image payload.") from exc
+
+    folder = _get_folder_for_purpose(purpose)
+    filename = f"{uuid4().hex}{extension}"
+    object_path = f"{folder}/{filename}"
+
+    try:
+        if keep_original:
+            with io.BytesIO(raw_bytes) as src:
+                await asyncio.to_thread(store_object_stream, object_path, src, len(raw_bytes), processed_content_type)
+        elif processed_bytes is not None:
+            await asyncio.to_thread(store_object_bytes, object_path, processed_bytes, processed_content_type)
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image payload.")
+    except StorageUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Image storage service is not available.",
+        ) from exc
+
+    return build_object_url(object_path)
 
 
 @router.get("/content/settings", response_model=SiteSettingRecord, summary="Get site settings from MongoDB")

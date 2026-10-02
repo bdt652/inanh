@@ -154,6 +154,7 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.110.104", "localhost", "127.0.0.1"],
   images: {
     unoptimized: disableImageOptimization,
     formats: ["image/avif", "image/webp"],

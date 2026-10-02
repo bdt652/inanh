@@ -66,3 +66,25 @@ def build_public_upload_url(request: Request, relative_path: str) -> str:
 
     # Fallback: use request.base_url (works in development)
     return f"{str(request.base_url).rstrip('/')}{UPLOADS_ROUTE_PREFIX}/{normalized_path}"
+
+
+def build_object_url(relative_path: str) -> str:
+    """
+    Build a public URL for a stored object without needing a Request.
+
+    Used by backend-only flows (e.g. AI-generated images) that store bytes
+    directly. Mirrors build_public_upload_url but resolves the host from
+    settings instead of request headers.
+    """
+    normalized = relative_path.replace("\\", "/").lstrip("/")
+
+    # Option 1: Direct MinIO public URL (no backend proxy)
+    if not _is_local_backend():
+        from app.core.config import settings
+
+        if settings.minio_public_base_url:
+            base = settings.minio_public_base_url.rstrip("/")
+            return f"{base}/{normalized}"
+
+    # Fallback: relative /uploads path (works when served from same origin)
+    return f"{UPLOADS_ROUTE_PREFIX}/{normalized}"

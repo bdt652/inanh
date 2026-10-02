@@ -25,13 +25,13 @@ def test_presigned_url_rewritten_to_public_host() -> None:
     original = _with_public_base("https://media.inanh24h.com/inanh24h-media")
     try:
         raw = (
-            "http://192.168.53.105:9000/inanh24h-media/user-uploads/u/s/photo.jpg"
+            "http://192.168.110.105:9000/inanh24h-media/user-uploads/u/s/photo.jpg"
             "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=abc123"
         )
         rewritten = _public_presigned_url(raw)
         assert rewritten.startswith("https://media.inanh24h.com/inanh24h-media/user-uploads/u/s/photo.jpg?")
         assert "X-Amz-Signature=abc123" in rewritten
-        assert "192.168.53.105" not in rewritten
+        assert "192.168.110.105" not in rewritten
     finally:
         settings.minio_public_base_url = original
 
@@ -39,7 +39,7 @@ def test_presigned_url_rewritten_to_public_host() -> None:
 def test_presigned_url_falls_back_without_public_base() -> None:
     original = _with_public_base("")
     try:
-        raw = "http://192.168.53.105:9000/inanh24h-media/photo.jpg?sig=1"
+        raw = "http://192.168.110.105:9000/inanh24h-media/photo.jpg?sig=1"
         assert _public_presigned_url(raw) == raw
     finally:
         settings.minio_public_base_url = original

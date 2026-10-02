@@ -8,7 +8,8 @@ import AdminNeedLogin from "../AdminNeedLogin";
 import AdminShell from "../AdminShell";
 import ConfirmActionModal from "../ConfirmActionModal";
 import TagInput from "../TagInput";
-import { createPost, deletePost, listPosts, updatePost, uploadImage } from "../api";
+import { createPost, deletePost, generatePostByAi, listPosts, updatePost, uploadImage } from "../api";
+import type { GeneratePostResult } from "../api";
 import type { PostRecord, PostUpsert } from "../types";
 import { useAdminToken } from "../useAdminToken";
 
@@ -61,6 +62,13 @@ export default function AdminPostsPage() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiKeywords, setAiKeywords] = useState("");
+  const [aiTone, setAiTone] = useState("thân thiện");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -163,6 +171,52 @@ export default function AdminPostsPage() {
     }
   };
 
+  const handleGenerateAi = async () => {
+    if (!token) return;
+    if (!aiTopic.trim()) {
+      setAiError("Vui lòng nhập chủ đề bài viết.");
+      return;
+    }
+    setAiGenerating(true);
+    setAiError("");
+    try {
+      const keywords = aiKeywords
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean);
+      const result: GeneratePostResult = await generatePostByAi(token, {
+        topic: aiTopic.trim(),
+        keywords: keywords.length ? keywords : undefined,
+        tone: aiTone.trim() || undefined,
+      });
+      const aiPost = result.post;
+      setForm({
+        slug: aiPost.slug ?? "",
+        title: aiPost.title ?? "",
+        summary: aiPost.summary ?? "",
+        content: aiPost.content ?? "",
+        cover_image: aiPost.cover_image ?? null,
+        is_published: false,
+        tags: aiPost.tags ?? [],
+        order: 0,
+        seo_title: aiPost.seo_title ?? "",
+        seo_description: aiPost.seo_description ?? "",
+        focus_keyword: aiPost.focus_keyword ?? "",
+      });
+      setEditingId(null);
+      setAiOpen(false);
+      setAiTopic("");
+      setAiKeywords("");
+      setNotice(
+        `Đã tạo nháp bằng AI${result.image_count ? ` (${result.image_count} ảnh)` : ""}. Hãy xem lại và lưu.`,
+      );
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Không thể tạo bài viết bằng AI.");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const handleUploadCover = async (file: File) => {
     if (!token) return;
     setUploadingCover(true);
@@ -191,13 +245,22 @@ export default function AdminPostsPage() {
       subtitle="Quản lý tin tức — hiển thị tại /tin-tuc."
       onLogout={logout}
       actions={
-        <button
-          type="button"
-          onClick={handleOpenCreate}
-          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
-        >
-          Thêm tin tức
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => setAiOpen(true)}
+            className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+          >
+            ✨ Tạo bằng AI
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenCreate}
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
+          >
+            Thêm tin tức
+          </button>
+        </>
       }
     >
       {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}
@@ -441,6 +504,66 @@ export default function AdminPostsPage() {
             </label>
           </div>
         </form>
+      </AdminModal>
+
+      <AdminModal
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        title="Tạo bài viết bằng AI"
+        description="Nhập chủ đề, AI sẽ sinh tiêu đề, nội dung, SEO và ảnh minh họa (ảnh trả phí theo Vertex)."
+        footer={
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setAiOpen(false)} className="rounded-xl border border-stone-300 px-4 py-2 text-sm">
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleGenerateAi()}
+              disabled={aiGenerating}
+              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+            >
+              {aiGenerating ? "Đang tạo (có thể mất vài phút)..." : "Tạo bài viết"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          {aiError && (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{aiError}</p>
+          )}
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            Chủ đề bài viết
+            <input
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              value={aiTopic}
+              onChange={(event) => setAiTopic(event.target.value)}
+              placeholder="Ví dụ: Cách chọn khổ ảnh canvas phù hợp"
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            Từ khóa (cách nhau bằng dấu phẩy)
+            <input
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              value={aiKeywords}
+              onChange={(event) => setAiKeywords(event.target.value)}
+              placeholder="in ảnh canvas, khổ ảnh, quà tặng"
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-stone-700">
+            Giọng điệu
+            <input
+              className="rounded-xl border border-stone-300 px-3 py-2 text-sm"
+              value={aiTone}
+              onChange={(event) => setAiTone(event.target.value)}
+              placeholder="thân thiện"
+            />
+          </label>
+          {aiGenerating && (
+            <p className="text-xs text-stone-500">
+              AI đang sinh nội dung và ảnh minh họa. Ảnh bìa + 3 ảnh section có thể mất 1-3 phút.
+            </p>
+          )}
+        </div>
       </AdminModal>
 
       <ConfirmActionModal

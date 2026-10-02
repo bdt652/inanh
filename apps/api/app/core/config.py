@@ -45,7 +45,8 @@ class Settings(BaseSettings):
     cors_allow_origins: List[str] = ["http://localhost:3000", "https://inanh24h.com", "https://www.inanh24h.com"]
     ai_base_url: str = "http://localhost:20128/v1"
     ai_api_key: str = ""
-    ai_model: str = "cc/claude-sonnet-4-6"
+    ai_model: str = "cc/agentgw.cloud"
+    ai_image_model: str = "enterprise/gpt-image-2k"
 
     @field_validator("storage_backend")
     @classmethod

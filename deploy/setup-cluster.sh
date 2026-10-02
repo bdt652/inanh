@@ -122,7 +122,7 @@ kubectl -n "$NS" create secret generic inanh24h-secrets \
   --from-literal=MINIO_ROOT_USER="${MINIO_ROOT_USER:-admin}" \
   --from-literal=MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-CHANGEME}" \
   --from-literal=AI_API_KEY="${AI_API_KEY:-CHANGEME}" \
-  --from-literal=AI_BASE_URL="${AI_BASE_URL:-http://192.168.53.106:20128/v1}" \
+  --from-literal=AI_BASE_URL="${AI_BASE_URL:-http://192.168.110.106:20128/v1}" \
   --from-literal=REVALIDATE_SECRET="${REVALIDATE_SECRET:-CHANGEME}" \
   --from-literal=SMS_PROVIDER_URL="${SMS_PROVIDER_URL:-}" \
   --from-literal=SMS_PROVIDER_TOKEN="${SMS_PROVIDER_TOKEN:-}" \
