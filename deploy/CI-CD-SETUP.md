@@ -25,9 +25,16 @@ Job deploy checkout đúng `github.sha`, rồi chạy `deploy/sync-manifests.sh`
 gọi script deploy đã cài. Runner cần quyền ghi vào thư mục này và các manifest
 không chứa secret bên trong; quản trị viên cấp quyền theo tài khoản runner thực tế.
 Không cấp thêm quyền sudo, không đổi quyền `.env` hoặc `01-secrets.yaml`.
-Nếu thiếu quyền, gặp symlink, hoặc có manifest YAML cũ không còn trong commit,
-pipeline dừng thay vì deploy cấu hình cũ. `01-secrets.yaml` luôn bị bỏ qua,
-không bị đọc hay ghi bởi bước đồng bộ.
+Nếu thiếu quyền, gặp symlink, hoặc có manifest YAML ngoài commit chưa được
+cho phép, pipeline dừng. `01-secrets.yaml` luôn bị bỏ qua, không bị đọc hay ghi
+bởi bước đồng bộ.
+
+Ngoại lệ chính xác: `40-nginx-ingress.yaml` là file chỉ có trên server đã được
+ghi nhận trong log deploy. Bước đồng bộ giữ nguyên file thường này (kể cả quyền
+read-only), không đọc, ghi đè, xóa hoặc tự tạo nội dung thay thế. Nếu checkout
+đưa vào file cùng tên thì pipeline dừng để tránh giành quyền quản lý cấu hình.
+Script deploy đã cài vẫn áp dụng các YAML như trước; ngoại lệ này không xác nhận
+nội dung ingress đúng và không thay đổi cách script đó áp dụng file trên server.
 
 Kiểm thử riêng bước đồng bộ (không cần cluster hoặc biến môi trường API):
 `python3 -m unittest discover -s deploy/tests -v`.

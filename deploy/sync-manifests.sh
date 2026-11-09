@@ -18,6 +18,10 @@ manifests=()
 for source in "$source_dir"/*.yaml; do
   name="${source##*/}"
   [[ "$name" == "01-secrets.yaml" ]] && continue
+  if [[ "$name" == "40-nginx-ingress.yaml" ]]; then
+    printf 'Server-only manifest must not be supplied by the checkout: %s\n' "$name" >&2
+    exit 1
+  fi
   if [[ -L "$source" || ! -f "$source" ]]; then
     printf 'Invalid source manifest: %s\n' "$name" >&2
     exit 1
@@ -28,11 +32,15 @@ if [[ ${#manifests[@]} -eq 0 ]]; then
   printf 'No nonsecret manifests found.\n' >&2
   exit 1
 fi
-# The installed script applies every YAML file. Refuse stale extras rather than
-# deleting files owned by the server or accidentally deploying an old manifest.
+# The installed script applies every YAML file. Preserve the known server-only
+# ingress file without reading/copying it; reject other unreviewed extras.
 for target in "$target_dir"/*.yaml; do
   name="${target##*/}"
   [[ "$name" == "01-secrets.yaml" ]] && continue
+  if [[ "$name" == "40-nginx-ingress.yaml" && -f "$target" && ! -L "$target" ]]; then
+    printf 'Preserving server-only manifest: %s\n' "$name"
+    continue
+  fi
   if [[ ! -f "$source_dir/$name" ]]; then
     printf 'Unexpected manifest in installed directory: %s\n' "$name" >&2
     exit 1

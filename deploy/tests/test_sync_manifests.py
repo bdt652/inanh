@@ -11,6 +11,47 @@ SCRIPT = ROOT / "deploy" / "sync-manifests.sh"
 
 
 class SyncManifestsTests(unittest.TestCase):
+    def test_preserves_server_only_ingress_while_updating_app_manifests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            target = Path(directory) / "target"
+            source.mkdir()
+            target.mkdir()
+            (source / "02-configmap-api.yaml").write_text("new subnet\n")
+            (target / "02-configmap-api.yaml").write_text("old subnet\n")
+            ingress = target / "40-nginx-ingress.yaml"
+            ingress.write_text("server-managed ingress fixture\n")
+            ingress.chmod(0o444)
+            original = ingress.stat()
+            result = subprocess.run(
+                ["bash", str(SCRIPT), str(source), str(target)],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((target / "02-configmap-api.yaml").read_text(), "new subnet\n")
+            self.assertEqual(ingress.read_text(), "server-managed ingress fixture\n")
+            self.assertEqual(ingress.stat().st_ino, original.st_ino)
+            self.assertEqual(ingress.stat().st_mode, original.st_mode)
+
+    def test_rejects_checkout_collision_with_server_only_ingress(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            target = Path(directory) / "target"
+            source.mkdir()
+            target.mkdir()
+            (source / "02-configmap-api.yaml").write_text("new\n")
+            (source / "40-nginx-ingress.yaml").write_text("unreviewed replacement\n")
+            ingress = target / "40-nginx-ingress.yaml"
+            ingress.write_text("server fixture\n")
+            result = subprocess.run(
+                ["bash", str(SCRIPT), str(source), str(target)],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Server-only manifest", result.stderr)
+            self.assertEqual(ingress.read_text(), "server fixture\n")
+            self.assertFalse((target / "02-configmap-api.yaml").exists())
+
     def test_copies_current_manifests_without_touching_secret(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source"
@@ -48,17 +89,17 @@ class SyncManifestsTests(unittest.TestCase):
             self.assertEqual((target / "02-configmap-api.yaml").read_text(), "old\n")
 
     def test_rejects_symlink_without_modifying_its_target(self):
-        for symlink_location in ("source", "target", "directory"):
+        for symlink_location in ("source", "target", "directory", "server-ingress"):
             with self.subTest(location=symlink_location), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 source = root / "source"
                 target = root / "target"
                 source.mkdir()
                 target.mkdir()
-                name = "02-configmap-api.yaml"
+                name = "40-nginx-ingress.yaml" if symlink_location == "server-ingress" else "02-configmap-api.yaml"
                 outside = root / "outside.yaml"
                 outside.write_text("untouched\n")
-                (source / name).write_text("new\n")
+                (source / "02-configmap-api.yaml").write_text("new\n")
                 if symlink_location == "directory":
                     link = root / "linked-target"
                     link.symlink_to(target, target_is_directory=True)
