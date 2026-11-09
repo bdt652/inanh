@@ -52,6 +52,9 @@ def _fake_chat_client() -> AsyncMock:
 
 def _install_mocks(monkeypatch: object) -> None:
     mp = monkeypatch  # type: ignore[assignment]
+    # The endpoint checks configuration before calling the mocked clients.
+    # Keep success tests independent of local .env files and CI secrets.
+    mp.setattr(ai_assistant.settings, "ai_api_key", "test-only-ai-api-key")
     mp.setattr(ai_assistant, "_make_client", lambda: _fake_chat_client())
     mp.setattr(
         ai_assistant,
@@ -104,6 +107,8 @@ def test_generate_post_unconfigured_returns_503(monkeypatch) -> None:
                 headers=headers,
             )
             assert resp.status_code == 503
+            assert resp.json()["detail"] == "AI service is not configured (missing ai_api_key)."
+            ai_assistant._generate_image_via_vertex.assert_not_awaited()
         finally:
             app.dependency_overrides.pop(get_db, None)
     finally:
