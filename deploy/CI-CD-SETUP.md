@@ -20,6 +20,24 @@ Script tạo namespace `inanh24h`, Secret `inanh24h-secrets` từ `.env`.
 (ServiceAccount trong script không còn bắt buộc vì dùng self-hosted runner,
 nhưng vô hại — có thể bỏ qua phần kubeconfig base64.)
 
+Job deploy checkout đúng `github.sha`, rồi chạy `deploy/sync-manifests.sh` để
+đồng bộ các manifest không chứa secret vào `/opt/inanh/deploy/k8s` trước khi
+gọi script deploy đã cài. Runner cần quyền ghi vào thư mục này và các manifest
+không chứa secret bên trong; quản trị viên cấp quyền theo tài khoản runner thực tế.
+Không cấp thêm quyền sudo, không đổi quyền `.env` hoặc `01-secrets.yaml`.
+Nếu thiếu quyền, gặp symlink, hoặc có manifest YAML cũ không còn trong commit,
+pipeline dừng thay vì deploy cấu hình cũ. `01-secrets.yaml` luôn bị bỏ qua,
+không bị đọc hay ghi bởi bước đồng bộ.
+
+Kiểm thử riêng bước đồng bộ (không cần cluster hoặc biến môi trường API):
+`python3 -m unittest discover -s deploy/tests -v`.
+
+Sau khi chuyển subnet, cần kiểm tra riêng origin của Cloudflare Tunnel cho
+`media.inanh24h.com` trên máy chạy tunnel. MinIO trong cấu hình hiện tại là
+`http://192.168.110.105:9000`; cấu hình tunnel không nằm trong repository này.
+Push/deploy thành công không chứng minh đường media đã hoạt động; cần kiểm tra
+`https://media.inanh24h.com/minio/health/live` và một URL ảnh đang tồn tại.
+
 ### 1b. Ingress (đã có sẵn — KHÔNG cài thêm)
 Máy 108 dùng **kubeadm + ingress-nginx + cert-manager** (đã chạy). KHÔNG cài Traefik.
 Public vào qua **Cloudflare Tunnel trên máy 100** → NodePort `30721` (web) / `31749` (api) → ingress-nginx.
